@@ -2,27 +2,35 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from LLM4GCL.backbones import GCNNet
+from LLM4GCL.backbones import GCNNet, GATNet, SAGENet
 from LLM4GCL.models import BaseModel
 
 from torch_geometric.utils import k_hop_subgraph
 
-class GCN(BaseModel):
+class BareGNN(BaseModel):
 
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
-        super(GCN, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+        super(BareGNN, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+        self.gnn_type = config['gnn']
         self.input_dim = self.feat_dim
         self.hidden_dim = config['hidden_dim']
         self.output_dim = self.num_class
         self.layer_num = config['layer_num']
         self.dropout = config['dropout']
-        self.device = device
+        self.num_heads = config['num_heads']
+        self.aggr = config['aggr']
 
-        class GCNModel(nn.Module):
+        class GNNModel(nn.Module):
 
-            def __init__(self, input_dim, hidden_dim, output_dim, layer_num, dropout, device):
-                super(GCNModel, self).__init__()
-                self.gcn = GCNNet(input_dim, hidden_dim, hidden_dim, layer_num, dropout).to(device)
+            def __init__(self, gnn_type, input_dim, hidden_dim, output_dim, layer_num, dropout, num_heads, aggr, device):
+                super(GNNModel, self).__init__()
+                if gnn_type == 'GCN':
+                    self.gnn = GCNNet(input_dim, hidden_dim, hidden_dim, layer_num, dropout).to(device)
+                elif gnn_type == 'GAT':
+                    self.gnn = GATNet(input_dim, hidden_dim, hidden_dim, layer_num, dropout, num_heads).to(device)
+                elif gnn_type == 'SAGE':
+                    self.gnn = SAGENet(input_dim, hidden_dim, hidden_dim, layer_num, dropout, aggr).to(device)
+
                 self.fc = nn.Sequential(
                     nn.Linear(hidden_dim, hidden_dim),
                     nn.ReLU(),
@@ -31,14 +39,14 @@ class GCN(BaseModel):
                 ).to(device)
 
             def forward(self, x, edge_index):
-                x = self.gcn(x, edge_index)
+                x = self.gnn(x, edge_index)
                 logits = self.fc(x)
 
                 return logits
             
-        self.model = GCNModel(self.input_dim, self.hidden_dim, self.output_dim, self.layer_num, self.dropout, self.device)
+        self.model = GNNModel(self.gnn_type, self.input_dim, self.hidden_dim, self.output_dim, self.layer_num, self.dropout, self.num_heads, self.aggr, self.device)
 
-    def train(self, model, text_dataset, train_loader, optimizer, class_num, config, device):
+    def train(self, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
         model.train()
         data = text_dataset.data
         all_loss, train_num = 0., 0
@@ -52,10 +60,10 @@ class GCN(BaseModel):
             logits = logits[:, :class_num]
             labels = batch['labels'].to(device)
 
-            loss = F.cross_entropy(logits, labels)
+            loss = self.loss_func(logits, labels)
             loss.backward()
             optimizer.step()
-            all_loss += loss
+            all_loss += loss * batch['node_id'].size(0)
             train_num += batch['node_id'].size(0)
 
         return all_loss / train_num

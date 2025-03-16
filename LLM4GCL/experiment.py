@@ -15,6 +15,7 @@ class Experiment(object):
 
         self.model_type = args.model_type
         self.model_name = args.model
+        self.model_path = args.model_path
         self.checkpoint_path = args.checkpoint_path
         
         self.cl_type = args.cl_type
@@ -42,14 +43,14 @@ class Experiment(object):
     def run(self, ):
         assert self.ntrail <= len(self.config['seed']), f"repetition num is larger than the length of seed list!"
         avg_acc_iso_list, avg_fgt_iso_list, avg_acc_jot_list, last_acc_jot_list = [], [], [], []
-        for i in range(self.ntrail):
-            seed = self.config['seed'][i]
+        for iter in range(self.ntrail):
+            seed = self.config['seed'][iter]
             seed_everything(seed)
 
             # Model Initialization
             result_logger = CLMetric()
             
-            if self.model_name in ['GCN']:
+            if self.model_name in ['BareGNN']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
@@ -59,9 +60,21 @@ class Experiment(object):
                     model_name=self.model_name, 
                     seed=seed, 
                     device=self.device)
+            elif self.model_name in ['BareLM']:
+                model = getattr(models, self.model_name)(
+                    task_loader=self.task_loader, 
+                    result_logger=result_logger, 
+                    config=self.config, 
+                    checkpoint_path=self.checkpoint_path, 
+                    dataset=self.dataset, 
+                    model_name=self.model_name, 
+                    model_path=self.model_path,
+                    seed=seed, 
+                    device=self.device
+                )
 
             self.model = model
-            result_logger = self.model.fit()
+            result_logger = self.model.fit(iter)
             avg_acc_iso, avg_fgt_iso, avg_acc_jot, last_acc_jot = result_logger.get_results()
 
             print(f"Iso. | Avg ACC: {avg_acc_iso:.4f} | Avg FGT: {avg_fgt_iso:.4f}")

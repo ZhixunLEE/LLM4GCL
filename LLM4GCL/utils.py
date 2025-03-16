@@ -1,4 +1,5 @@
 import os
+import math
 import yaml
 import torch
 import random
@@ -39,15 +40,14 @@ def seed_everything(seed):
 def _save_checkpoint(model, optimizer, cur_epoch, checkpoint_path, dataset, model_name, seed):
     os.makedirs(checkpoint_path, exist_ok=True)
 
-    param_grad_dic = {
-        k: v.requires_grad for (k, v) in model.named_parameters()
-    }
-    state_dict = model.state_dict()
+    save_dir = os.path.join(checkpoint_path, model_name)
+    os.makedirs(save_dir, exist_ok=True)
+    save_to = os.path.join(save_dir, f"{dataset}_seed{seed}_best.pth")
 
-    for k in list(state_dict.keys()):
-        if k in param_grad_dic.keys() and not param_grad_dic[k]:
-            # delete parameters that do not require gradient
-            del state_dict[k]
+    state_dict = {
+        k: v for k, v in model.state_dict().items()
+        if v.requires_grad
+    }
 
     save_obj = {
         "model": state_dict,
@@ -55,15 +55,15 @@ def _save_checkpoint(model, optimizer, cur_epoch, checkpoint_path, dataset, mode
         # "epoch": cur_epoch,
     }
 
-    path = f'{dataset}_{model_name}_seed{seed}'
-    save_to = os.path.join(checkpoint_path, path+"_checkpoint_best.pth")
-
-    print("Saving checkpoint at epoch {} to {}.".format(cur_epoch, save_to))
-    torch.save(save_obj, save_to)
+    try:
+        torch.save(save_obj, save_to)
+        print(f"Saving checkpoint at epoch {cur_epoch} to {save_to}.")
+    except Exception as e:
+        print(f"Failed to save checkpoint: {e}")
 
 
 def _reload_best_model(model, checkpoint_path, dataset, model_name, seed):
-    path = f'{dataset}_{model_name}_seed{seed}_checkpoint_best.pth'
+    path = f'{model_name}/{dataset}_seed{seed}_best.pth'
     checkpoint_path = os.path.join(checkpoint_path, path)
 
     print("Loading checkpoint from {}.".format(checkpoint_path))
@@ -72,3 +72,12 @@ def _reload_best_model(model, checkpoint_path, dataset, model_name, seed):
     model.load_state_dict(checkpoint["model"], strict=False)
 
     return model
+
+
+def adjust_learning_rate(param_group, epoch, config):
+    if epoch < config['warmup_epochs']:
+        lr = float(config['lr']) * epoch / config['warmup_epochs']
+    else:
+        lr = float(config['min_lr']) + (float(config['lr']) - float(config['min_lr'])) * 0.5 * (1.0 + math.cos(math.pi * (epoch - config['warmup_epochs']) / (config['epochs'] - config['warmup_epochs'])))
+    param_group["lr"] = lr
+    return lr

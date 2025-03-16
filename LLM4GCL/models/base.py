@@ -2,7 +2,9 @@ import torch
 import numpy as np
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 
+from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score
 from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 
@@ -26,8 +28,12 @@ class BaseModel(nn.Module):
     def get_optimizer(self, model):
         optimizer = optim.Adam(model.parameters(), lr=float(self.config['lr']), weight_decay=float(self.config['weight_decay']))
         return optimizer
+    
+    def loss_func(self, logits, labels):
+        loss = F.cross_entropy(logits, labels)
+        return loss
 
-    def train(self, model, text_dataset, train_loader, optimizer, class_num, config, device):
+    def train(self, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
         raise "The train method is not declared !"
     
     @torch.no_grad()
@@ -38,7 +44,7 @@ class BaseModel(nn.Module):
     def evaluate(self, model, text_dataset, test_loader, class_num, config, device):
         raise "The evaluate method is not declared !"
     
-    def fit(self, ):
+    def fit(self, iter):
         optimizer = self.get_optimizer(self.model)
 
         for curr_session in range(self.session_num):
@@ -47,14 +53,18 @@ class BaseModel(nn.Module):
 
             class_num, text_dataset, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
+            progress_bar = tqdm(range(self.config['epochs']))
+            progress_bar.set_description(f'Training | Iter {iter}')
+
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):
-                loss = self.train(self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
-                print("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss.item()))
+                if curr_session == 0:
+                    loss = self.train(epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
+                progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
 
-                if epoch > 0 and epoch % 10 == 0:
+                if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
                     acc_valid, f1_valid = self.valid(self.model, text_dataset, valid_loader, class_num, self.config, self.device)
-                    print("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(curr_session, epoch, acc_valid, f1_valid, tolerate))
+                    progress_bar.write("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(curr_session, epoch, acc_valid, f1_valid, tolerate))
                     if acc_valid > best_acc_valid:
                         tolerate = 0
                         best_acc_valid = acc_valid
@@ -63,6 +73,15 @@ class BaseModel(nn.Module):
                         tolerate += 1
                         if tolerate > self.config['patience']: 
                             break
+
+                progress_bar.set_postfix({
+                    'Loss': f"{loss:.4f}",
+                    'Best Valid ACC': f"{best_acc_valid:.4f}",
+                    'Tolerate': tolerate
+                })
+
+                progress_bar.update(1)
+            progress_bar.close()
 
             _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
             curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset, test_loader_isolate, class_num, self.config, self.device)
