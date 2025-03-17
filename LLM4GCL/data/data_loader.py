@@ -1,5 +1,7 @@
+import heapq
 import torch
 from torch_geometric.data import Data
+from torch_geometric.utils import add_self_loops
 
 from torch.utils.data import Dataset
 
@@ -70,9 +72,11 @@ class TextDataset(Dataset):
             labels = torch.tensor(labels)
             data.y = labels
 
+        edge_index, _ = add_self_loops(data.edge_index)
+
         new_data = Data(
             x=data.x,
-            edge_index=data.edge_index,
+            edge_index=edge_index,
             y=data.y,
             raw_texts=data.raw_texts,
         )
@@ -83,6 +87,19 @@ class TextDataset(Dataset):
         id_by_class = {i: [] for i in class_list}
         for id, cla in enumerate(labels):
             id_by_class[cla.item()].append(id)
+
+        # num_nodes = [len(v) for _, v in id_by_class.items()]
+        # sorted_class_idx = heapq.nlargest(labels.max().item() + 1, enumerate(num_nodes), key=lambda x: x[1])
+
+        # # Re-order labels
+        # for i, (id, _) in enumerate(sorted_class_idx):
+        #     class_idx = id_by_class[id]
+        #     labels[class_idx] = i
+
+        # class_list = labels.unique().numpy()
+        # id_by_class = {i: [] for i in class_list}
+        # for id, cla in enumerate(labels):
+        #     id_by_class[cla.item()].append(id)
 
         print(f"--------------------------------------------")
         print(f"Load dataset {self.dataset}!")

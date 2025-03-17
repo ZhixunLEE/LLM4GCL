@@ -1,49 +1,91 @@
 import torch
-import numpy as np
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
 
-from tqdm import tqdm
-from sklearn.metrics import accuracy_score, f1_score
+from LLM4GCL.models import BareGNN
 from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 
-class BaseModel(nn.Module):
+from tqdm import tqdm
+from torch_geometric.utils import k_hop_subgraph
+
+class EWC(BareGNN):
 
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
-        super(BaseModel, self).__init__()
-        self.task_loader = task_loader
-        self.result_logger = result_logger
-        self.session_num = task_loader.task_num
-        self.feat_dim = task_loader.data.x.shape[1]
-        self.num_class = task_loader.data.y.max().item() + 1
-        self.config = config
-        self.checkpoint_path = checkpoint_path
-        self.dataset = dataset
-        self.model_name = model_name
-        self.seed = seed
-        self.device = device
-        self.model = None
+        super(EWC, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+        
+        self.reg = config['EWC']['strength']
+        self.current_task = 0
+        self.fisher = {}
+        self.optpar = {}
 
-    def get_optimizer(self, model):
-        optimizer = optim.Adam(model.parameters(), lr=float(self.config['lr']), weight_decay=float(self.config['weight_decay']))
-        return optimizer
-    
-    def loss_func(self, logits, labels):
-        loss = F.cross_entropy(logits, labels)
-        return loss
+
+    def new_weight(self, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
+        model.train()
+        data = text_dataset.data
+        param_grad_epoch = []
+        for _, batch in enumerate(train_loader):
+            if batch['node_id'].size(0) < 2:
+                break
+            param_grad_batch = []
+            optimizer.zero_grad()
+            subset, edge_index, mapping, _ = k_hop_subgraph(batch['node_id'], config['layer_num'], data.edge_index, relabel_nodes=True)
+            logits = model(data.x[subset].to(device), edge_index.to(device))[mapping]
+
+            logits = logits[:, :class_num]
+            labels = batch['labels'].to(device)
+
+            loss = self.loss_func(logits, labels)
+
+            loss.backward()
+            optimizer.step()
+
+            for p in self.model.parameters():
+                param_grad = p.grad.data.clone().pow(2)
+                param_grad_batch.append(param_grad)
+            param_grad_epoch.append(param_grad_batch)
+
+        self.fisher[self.current_task] = []
+        self.optpar[self.current_task] = []
+        for i, p in enumerate(self.model.parameters()):
+            param_grad_ = []
+            for param_grad_batch_ in param_grad_epoch:
+                param_grad_.append(param_grad_batch_[i])
+            self.fisher[self.current_task].append(sum(param_grad_) / len(param_grad_))
+            pd = p.data.clone()
+            self.optpar[self.current_task].append(pd)
+        self.current_task += 1
+
 
     def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
-        raise "The train method is not declared !"
+        model.train()
+        data = text_dataset.data
+        all_loss, train_num = 0., 0
+        for _, batch in enumerate(train_loader):
+            if batch['node_id'].size(0) < 2:
+                break
+            optimizer.zero_grad()
+            subset, edge_index, mapping, _ = k_hop_subgraph(batch['node_id'], config['layer_num'], data.edge_index, relabel_nodes=True)
+            logits = model(data.x[subset].to(device), edge_index.to(device))[mapping]
+
+            logits = logits[:, :class_num]
+            labels = batch['labels'].to(device)
+
+            loss = self.loss_func(logits, labels)
+
+            for s in range(self.current_task):
+                for i, p in enumerate(self.model.parameters()):
+                    l = self.reg * self.fisher[s][i]
+                    l = l * (p - self.optpar[s][i]).pow(2)
+                    loss += l.sum()
+
+            loss.backward()
+            optimizer.step()
+            all_loss += loss * batch['node_id'].size(0)
+            train_num += batch['node_id'].size(0)
+
+        return all_loss / train_num
     
-    @torch.no_grad()
-    def valid(self, model, text_dataset, valid_loader, class_num, config, device):
-        raise "The valid method is not declared !"
-    
-    @torch.no_grad()
-    def evaluate(self, model, text_dataset, test_loader, class_num, config, device):
-        raise "The evaluate method is not declared !"
-    
+
     def fit(self, iter):
         optimizer = self.get_optimizer(self.model)
 
@@ -58,7 +100,7 @@ class BaseModel(nn.Module):
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):
-                loss = self.train(curr_session, epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
+                loss = self.train(epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
                 progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
 
                 if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
@@ -82,6 +124,7 @@ class BaseModel(nn.Module):
                 progress_bar.update(1)
             progress_bar.close()
 
+            self.new_weight(epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
             _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
             curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset, test_loader_isolate, class_num, self.config, self.device)
             curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset, test_loader_joint, class_num, self.config, self.device)
@@ -99,14 +142,3 @@ class BaseModel(nn.Module):
             self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
 
         return self.result_logger
-
-
-    def get_metric(self, logits, preds, labels):
-        logits = logits.detach().cpu().numpy()
-        preds = preds.cpu().numpy()
-        labels = labels.cpu().numpy()
-        acc = accuracy_score(labels, preds)
-        f1 = f1_score(labels, preds, average='macro', zero_division=0)
-
-        return acc, f1
-

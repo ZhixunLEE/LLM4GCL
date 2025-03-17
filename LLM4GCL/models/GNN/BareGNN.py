@@ -46,7 +46,7 @@ class BareGNN(BaseModel):
             
         self.model = GNNModel(self.gnn_type, self.input_dim, self.hidden_dim, self.output_dim, self.layer_num, self.dropout, self.num_heads, self.aggr, self.device)
 
-    def train(self, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
+    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
         model.train()
         data = text_dataset.data
         all_loss, train_num = 0., 0
@@ -54,6 +54,7 @@ class BareGNN(BaseModel):
             if batch['node_id'].size(0) < 2:
                 break
             optimizer.zero_grad()
+            
             subset, edge_index, mapping, _ = k_hop_subgraph(batch['node_id'], config['layer_num'], data.edge_index, relabel_nodes=True)
             logits = model(data.x[subset].to(device), edge_index.to(device))[mapping]
 

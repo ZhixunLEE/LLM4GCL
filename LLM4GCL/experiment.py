@@ -50,7 +50,7 @@ class Experiment(object):
             # Model Initialization
             result_logger = CLMetric()
             
-            if self.model_name in ['BareGNN']:
+            if self.model_name in ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
@@ -72,6 +72,8 @@ class Experiment(object):
                     seed=seed, 
                     device=self.device
                 )
+            else:
+                raise ValueError(f'Unsupported model {self.model_name}!')
 
             self.model = model
             result_logger = self.model.fit(iter)

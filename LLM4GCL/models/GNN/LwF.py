@@ -1,49 +1,67 @@
 import torch
-import numpy as np
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
 
-from tqdm import tqdm
-from sklearn.metrics import accuracy_score, f1_score
+from LLM4GCL.models import BareGNN
 from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 
-class BaseModel(nn.Module):
+from tqdm import tqdm
+from copy import deepcopy
+from torch.autograd import Variable
+from torch_geometric.utils import k_hop_subgraph
+
+
+def MultiClassCrossEntropy(logits, labels, T):
+    labels = Variable(labels.data, requires_grad=False).cuda()
+    outputs = torch.log_softmax(logits / T, dim=1)   # compute the log of softmax values
+    labels = torch.softmax(labels / T, dim=1)
+    outputs = torch.sum(outputs * labels, dim=1, keepdim=False)
+    outputs = -torch.mean(outputs, dim=0, keepdim=False)
+    return outputs
+
+
+class LwF(BareGNN):
 
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
-        super(BaseModel, self).__init__()
-        self.task_loader = task_loader
-        self.result_logger = result_logger
-        self.session_num = task_loader.task_num
-        self.feat_dim = task_loader.data.x.shape[1]
-        self.num_class = task_loader.data.y.max().item() + 1
-        self.config = config
-        self.checkpoint_path = checkpoint_path
-        self.dataset = dataset
-        self.model_name = model_name
-        self.seed = seed
-        self.device = device
-        self.model = None
+        super(LwF, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+        
+        self.lambda_dist = config['LwF']['lambda']
+        self.T = config['LwF']['T']
+        self.prev_model = None
 
-    def get_optimizer(self, model):
-        optimizer = optim.Adam(model.parameters(), lr=float(self.config['lr']), weight_decay=float(self.config['weight_decay']))
-        return optimizer
-    
-    def loss_func(self, logits, labels):
-        loss = F.cross_entropy(logits, labels)
-        return loss
+    def lwf_train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
+        model.train()
+        data = text_dataset.data
+        all_loss, train_num = 0., 0
+        for _, batch in enumerate(train_loader):
+            if batch['node_id'].size(0) < 2:
+                break
+            optimizer.zero_grad()
+            
+            subset, edge_index, mapping, _ = k_hop_subgraph(batch['node_id'], config['layer_num'], data.edge_index, relabel_nodes=True)
+            output = model(data.x[subset].to(device), edge_index.to(device))[mapping]
+            prev_output = self.prev_model(data.x[subset].to(device), edge_index.to(device))[mapping]
 
-    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
-        raise "The train method is not declared !"
+            logits = output[:, :class_num]
+            labels = batch['labels'].to(device)
+
+            loss = self.loss_func(logits, labels)
+
+            class_num_offset = 0
+            for s in range(curr_session):
+                old_class_num, _, _, _, _, _ = self.task_loader.get_task(s)
+                output_dist = output[:, class_num_offset : old_class_num]
+                prev_output_dist = prev_output[:, class_num_offset : old_class_num]
+                loss_dist = MultiClassCrossEntropy(output_dist, prev_output_dist, self.T)
+                class_num_offset = old_class_num
+                loss = loss + self.lambda_dist * loss_dist
+
+            loss.backward()
+            optimizer.step()
+            all_loss += loss * batch['node_id'].size(0)
+            train_num += batch['node_id'].size(0)
+
+        return all_loss / train_num
     
-    @torch.no_grad()
-    def valid(self, model, text_dataset, valid_loader, class_num, config, device):
-        raise "The valid method is not declared !"
-    
-    @torch.no_grad()
-    def evaluate(self, model, text_dataset, test_loader, class_num, config, device):
-        raise "The evaluate method is not declared !"
-    
+
     def fit(self, iter):
         optimizer = self.get_optimizer(self.model)
 
@@ -58,7 +76,10 @@ class BaseModel(nn.Module):
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):
-                loss = self.train(curr_session, epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
+                if curr_session == 0:
+                    loss = self.train(curr_session, epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
+                else:
+                    loss = self.lwf_train(curr_session, epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
                 progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
 
                 if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
@@ -97,16 +118,6 @@ class BaseModel(nn.Module):
             print("Session: {} | Jot. Acc Test: {:.4f} | Jot. F1 Test: {:.4f}".format(curr_session, curr_acc_test_joint, curr_f1_test_joint))
 
             self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
+            self.prev_model = deepcopy(self.model).to(self.device)
 
         return self.result_logger
-
-
-    def get_metric(self, logits, preds, labels):
-        logits = logits.detach().cpu().numpy()
-        preds = preds.cpu().numpy()
-        labels = labels.cpu().numpy()
-        acc = accuracy_score(labels, preds)
-        f1 = f1_score(labels, preds, average='macro', zero_division=0)
-
-        return acc, f1
-

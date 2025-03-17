@@ -62,7 +62,7 @@ class BareLM(BaseModel):
 
         return optimizer
 
-    def train(self, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
+    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
         model.train()
         accum_loss = 0.
         all_loss, train_num = 0., 0

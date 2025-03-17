@@ -30,7 +30,28 @@ class TaskLoader():
         self.test_idx_per_task_joint = test_idx_per_task_joint
         self.dataset_per_task = dataset_per_task
 
-    def get_task(self, task_id):
+    def get_joint_task(self, ):
+        all_train_idx, all_valid_idx, all_test_idx = [], [], []
+        for task_id in range(self.task_num):
+            all_train_idx.extend(self.train_idx_per_task[task_id])
+            all_valid_idx.extend(self.valid_idx_per_task[task_id])
+            all_test_idx.extend(self.test_idx_per_task_isolate[task_id])
+
+        text_dataset = self.dataset_per_task[self.task_num - 1]
+
+        train_dataset = Subset(text_dataset, all_train_idx)
+        val_dataset = Subset(text_dataset, all_valid_idx)
+        test_dataset = Subset(text_dataset, all_test_idx)
+
+        train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
+        valid_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=self.batch_size, shuffle=False)
+
+        class_num = self.data.y[all_train_idx].max().item() + 1
+
+        return class_num, text_dataset, train_loader, valid_loader, test_loader
+
+    def get_task(self, task_id, subset = -1):
         if task_id >= self.task_num:
             raise f"Task id {task_id} is larger than total number of tasks {self.task_num} !"
         
@@ -38,6 +59,13 @@ class TaskLoader():
         valid_idx = self.valid_idx_per_task[task_id]
         test_idx_isolate = self.test_idx_per_task_isolate[task_id]
         test_idx_joint = self.test_idx_per_task_joint[task_id]
+        
+        if subset != -1:
+            train_idx = random.sample(train_idx, min(len(train_idx), subset))
+            valid_idx = random.sample(valid_idx, min(len(valid_idx), subset))
+            test_idx_isolate = random.sample(test_idx_isolate, min(len(test_idx_isolate), subset))
+            test_idx_joint = random.sample(test_idx_joint, min(len(test_idx_joint), subset))
+
         text_dataset = self.dataset_per_task[task_id]
 
         train_dataset = Subset(text_dataset, train_idx)
@@ -47,8 +75,8 @@ class TaskLoader():
 
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         valid_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=True)
-        test_loader_isolate = DataLoader(test_dataset_isolate, batch_size=self.batch_size, shuffle=True)
-        test_loader_joint = DataLoader(test_dataset_joint, batch_size=self.batch_size, shuffle=True)
+        test_loader_isolate = DataLoader(test_dataset_isolate, batch_size=self.batch_size, shuffle=False)
+        test_loader_joint = DataLoader(test_dataset_joint, batch_size=self.batch_size, shuffle=False)
 
         class_num = self.data.y[train_idx].max().item() + 1
 
@@ -105,6 +133,7 @@ class TaskLoader():
         observe_idx = []
         for cls in class_id:
             observe_idx.extend(self.id_by_class[cls])
+
         node_mask[observe_idx] = True
         edge_index = self.data.edge_index
 
