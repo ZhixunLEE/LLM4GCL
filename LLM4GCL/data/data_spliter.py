@@ -23,12 +23,13 @@ class TaskLoader():
                 self.task_num = self.data.y.max().item() // self.session_size
 
         # Task Split
-        train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task = self._split_data()
+        train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint = self._split_data()
         self.train_idx_per_task = train_idx_per_task
         self.valid_idx_per_task = valid_idx_per_task
         self.test_idx_per_task_isolate = test_idx_per_task_isolate
         self.test_idx_per_task_joint = test_idx_per_task_joint
-        self.dataset_per_task = dataset_per_task
+        self.dataset_per_task_isolate = dataset_per_task_isolate
+        self.dataset_per_task_joint = dataset_per_task_joint
 
     def get_joint_task(self, ):
         all_train_idx, all_valid_idx, all_test_idx = [], [], []
@@ -37,7 +38,7 @@ class TaskLoader():
             all_valid_idx.extend(self.valid_idx_per_task[task_id])
             all_test_idx.extend(self.test_idx_per_task_isolate[task_id])
 
-        text_dataset = self.dataset_per_task[self.task_num - 1]
+        text_dataset = self.dataset_per_task_joint[self.task_num - 1]
 
         train_dataset = Subset(text_dataset, all_train_idx)
         val_dataset = Subset(text_dataset, all_valid_idx)
@@ -63,15 +64,14 @@ class TaskLoader():
         if subset != -1:
             train_idx = random.sample(train_idx, min(len(train_idx), subset))
             valid_idx = random.sample(valid_idx, min(len(valid_idx), subset))
-            test_idx_isolate = random.sample(test_idx_isolate, min(len(test_idx_isolate), subset))
-            test_idx_joint = random.sample(test_idx_joint, min(len(test_idx_joint), subset))
 
-        text_dataset = self.dataset_per_task[task_id]
+        text_dataset_isolate = self.dataset_per_task_isolate[task_id]
+        text_dataset_joint = self.dataset_per_task_joint[task_id]
 
-        train_dataset = Subset(text_dataset, train_idx)
-        val_dataset = Subset(text_dataset, valid_idx)
-        test_dataset_isolate = Subset(text_dataset, test_idx_isolate)
-        test_dataset_joint = Subset(text_dataset, test_idx_joint)
+        train_dataset = Subset(text_dataset_isolate, train_idx)
+        val_dataset = Subset(text_dataset_isolate, valid_idx)
+        test_dataset_isolate = Subset(text_dataset_isolate, test_idx_isolate)
+        test_dataset_joint = Subset(text_dataset_joint, test_idx_joint)
 
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         valid_loader = DataLoader(val_dataset, batch_size=self.batch_size, shuffle=True)
@@ -80,7 +80,7 @@ class TaskLoader():
 
         class_num = self.data.y[train_idx].max().item() + 1
 
-        return class_num, text_dataset, train_loader, valid_loader, test_loader_isolate, test_loader_joint
+        return class_num, text_dataset_isolate, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint
 
     def _split_data(self, ):
         if self.cl_type == 'class':
@@ -94,7 +94,8 @@ class TaskLoader():
         valid_idx_per_task = []
         test_idx_per_task_isolate = []
         test_idx_per_task_joint = []
-        dataset_per_task = []
+        dataset_per_task_isolate = []
+        dataset_per_task_joint = []
 
         all_class = self.data.y.unique(sorted=True).tolist()
 
@@ -123,10 +124,12 @@ class TaskLoader():
             else:
                 test_idx_per_task_joint.append(test_idx_curr_task)
 
-            curr_dataset = self._adjust_graph(all_class[: (i + 1) * self.session_size])
-            dataset_per_task.append(curr_dataset)
+            curr_dataset = self._adjust_graph(all_class[i * self.session_size : (i + 1) * self.session_size])
+            dataset_per_task_isolate.append(curr_dataset)
+            prev_dataset = self._adjust_graph(all_class[: (i + 1) * self.session_size])
+            dataset_per_task_joint.append(prev_dataset)
 
-        return train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task
+        return train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint
 
     def _adjust_graph(self, class_id):
         node_mask = torch.zeros(len(self.data.y), dtype=torch.bool)

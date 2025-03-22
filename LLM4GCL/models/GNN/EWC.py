@@ -93,18 +93,18 @@ class EWC(BareGNN):
             if curr_session != 0:
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
 
-            class_num, text_dataset, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
+            class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
             progress_bar.set_description(f'Training | Iter {iter}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):
-                loss = self.train(epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
+                loss = self.train(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device)
                 progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
 
                 if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
-                    acc_valid, f1_valid = self.valid(self.model, text_dataset, valid_loader, class_num, self.config, self.device)
+                    acc_valid, f1_valid = self.valid(self.model, text_dataset_iso, valid_loader, class_num, self.config, self.device)
                     progress_bar.write("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(curr_session, epoch, acc_valid, f1_valid, tolerate))
                     if acc_valid > best_acc_valid:
                         tolerate = 0
@@ -124,15 +124,15 @@ class EWC(BareGNN):
                 progress_bar.update(1)
             progress_bar.close()
 
-            self.new_weight(epoch, self.model, text_dataset, train_loader, optimizer, class_num, self.config, self.device)
+            self.new_weight(epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device)
             _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-            curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset, test_loader_isolate, class_num, self.config, self.device)
-            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset, test_loader_joint, class_num, self.config, self.device)
+            curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device)
+            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device)
 
             acc_list = []
             for s in range(curr_session):
-                _, text_dataset, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
-                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset, test_loader_isolate, class_num, self.config, self.device)
+                _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
+                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device)
                 acc_list.append(prev_acc_test_isolate)
             acc_list.append(curr_acc_test_isolate)
 

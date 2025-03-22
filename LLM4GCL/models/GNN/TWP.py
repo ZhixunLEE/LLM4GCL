@@ -1,6 +1,4 @@
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 from LLM4GCL.models import BareGNN
 from LLM4GCL.utils import _save_checkpoint, _reload_best_model
@@ -8,64 +6,66 @@ from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 from tqdm import tqdm
 from torch_geometric.utils import k_hop_subgraph
 
-class MAS(BareGNN):
+
+class TWP(BareGNN):
 
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
-        super(MAS, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+        super(TWP, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
         
-        self.reg = config['MAS']['strength']
         self.current_task = 0
-        self.fisher = []
-        self.optpar = []
-        self.n_seen_examples = 0
+        self.fisher_loss = {}
+        self.fisher_att = {}
+        self.optpar = {}
         self.mem_mask = None
 
+        self.lambda_l = config['lambda_l']
+        self.lambda_t = config['lambda_t']
+        self.beta = config['beta']
 
-    def new_weight(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
-        self.optpar = []
-        new_fisher = []
-        param_grad_epoch = []
-        n_new_examples = 0
 
+    def new_weight(self, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
         model.train()
         data = text_dataset.data
+        self.model.zero_grad()
+        self.fisher_loss[self.current_task] = []
+        self.fisher_att[self.current_task] = []
+        self.optpar[self.current_task] = []
+
+        pgss_floss,pgss_fatt = [], []
         for _, batch in enumerate(train_loader):
             if batch['node_id'].size(0) < 2:
                 break
-            param_grad_batch = []
-            n_new_examples += batch['node_id'].size(0)
+            pgs_floss,pgs_fatt = [], []
             optimizer.zero_grad()
             subset, edge_index, mapping, _ = k_hop_subgraph(batch['node_id'], config['layer_num'], data.edge_index, relabel_nodes=True)
             logits = model(data.x[subset].to(device), edge_index.to(device))[mapping]
 
             logits = logits[:, :class_num]
-            logits.pow_(2)
-            loss = logits.mean()
+            labels = batch['labels'].to(device)
 
-            loss.backward()
-            optimizer.step()
+            loss = self.loss_func(logits, labels)
+            loss.backward(retain_graph=True)
 
             for p in self.model.parameters():
-                param_grad = p.grad.data.clone().pow(2)
-                param_grad_batch.append(param_grad)
-            param_grad_epoch.append(param_grad_batch)
+                pg = p.grad.data.clone().pow(2)
+                pgs_floss.append(pg)
+            pgss_floss.append(pgs_floss)
 
-        for i,p in enumerate(self.model.parameters()):
-            param_grad_ = []
-            for param_grad_batch_ in param_grad_epoch:
-                param_grad_.append(param_grad_batch_[i])
-            new_fisher.append(sum(param_grad_) / len(param_grad_))
-            pd = p.data.clone()
-            self.optpar.append(pd)
+            for p in self.model.parameters():
+                pg = p.grad.data.clone().pow(2)
+                pgs_fatt.append(pg)
+            pgss_fatt.append(pgs_floss)
 
-        if len(self.fisher) != 0:
-            for i, f in enumerate(new_fisher):
-                self.fisher[i] = (self.fisher[i] * self.n_seen_examples + new_fisher[i]* n_new_examples) / (self.n_seen_examples + n_new_examples)
-            self.n_seen_examples += n_new_examples
-        else:
-            for i, f in enumerate(new_fisher):
-                self.fisher.append(new_fisher[i])
-            self.n_seen_examples = n_new_examples
+            for i,p in enumerate(self.model.parameters()):
+                pg_floss_,pgs_fatt_ = [],[]
+                for pgs_ in pgss_floss:
+                    pg_floss_.append(pgs_[i])
+                for pgs_ in pgss_fatt:
+                    pgs_fatt_.append(pgs_[i])
+                pd = p.data.clone()
+                self.optpar[self.current_task].append(pd)
+                self.fisher_loss[self.current_task].append(sum(pg_floss_)/len(pg_floss_))
+                self.fisher_att[self.current_task].append(sum(pgs_fatt_)/len(pgs_fatt_))
 
         self.current_task += 1
 
@@ -86,10 +86,15 @@ class MAS(BareGNN):
 
             loss = self.loss_func(logits, labels)
 
-            if self.current_task > 0:
+            grad_norm = 0
+            for p in self.model.parameters():
+                param_grad = p.grad.data.clone()
+                grad_norm += torch.norm(param_grad, p=1)
+
+            for s in range(self.current_task):
                 for i, p in enumerate(self.model.parameters()):
-                    l = self.reg * self.fisher[i]
-                    l = l * (p - self.optpar[i]).pow(2)
+                    l = self.lambda_l * self.fisher_loss[s][i] + self.lambda_t * self.fisher_att[s][i]
+                    l = l * (p - self.optpar[s][i]).pow(2)
                     loss += l.sum()
 
             loss.backward()
@@ -138,7 +143,7 @@ class MAS(BareGNN):
                 progress_bar.update(1)
             progress_bar.close()
 
-            self.new_weight(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device)
+            self.new_weight(epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device)
             _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
             curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device)
             curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device)

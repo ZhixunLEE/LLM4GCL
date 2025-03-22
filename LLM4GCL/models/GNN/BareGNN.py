@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from LLM4GCL.backbones import GCNNet, GATNet, SAGENet
+from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
 from LLM4GCL.models import BaseModel
 
 from torch_geometric.utils import k_hop_subgraph
@@ -30,6 +30,8 @@ class BareGNN(BaseModel):
                     self.gnn = GATNet(input_dim, hidden_dim, hidden_dim, layer_num, dropout, num_heads).to(device)
                 elif gnn_type == 'SAGE':
                     self.gnn = SAGENet(input_dim, hidden_dim, hidden_dim, layer_num, dropout, aggr).to(device)
+                elif gnn_type == 'SGC':
+                    self.gnn = SGCNet(input_dim, hidden_dim, hidden_dim, layer_num, dropout).to(device)
 
                 self.fc = nn.Sequential(
                     nn.Linear(hidden_dim, hidden_dim),

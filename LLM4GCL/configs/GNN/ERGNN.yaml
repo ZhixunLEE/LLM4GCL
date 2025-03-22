@@ -1,0 +1,19 @@
+default:
+  gnn: 'GCN'
+  seed: [0, 1, 2, 3, 4]
+  epochs: 300
+  valid_epoch: 10
+  lr: 1e-4
+  weight_decay: 5e-4
+  layer_num: 2
+  hidden_dim: 128
+  dropout: 0.5
+  patience: 20
+  batch_size: 256
+  num_heads: 4 # only available for GATConv
+  aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
+
+  ERGNN:
+    sampler: 'CM'
+    budget: 10 # [10, 100]
+    d: 0.05 # [0.05, 0.5, 5.0]

@@ -50,12 +50,12 @@ class JointGNN(BareGNN):
         for curr_session in range(self.session_num):
             acc_list = []
             for s in range(curr_session + 1):
-                _, text_dataset, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
-                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset, test_loader_isolate, class_num, self.config, self.device)
+                _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
+                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device)
                 acc_list.append(prev_acc_test_isolate)
 
-            _, text_dataset, _, _, _, test_loader_joint = self.task_loader.get_task(curr_session)
-            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset, test_loader_joint, class_num, self.config, self.device)
+            _, _, text_dataset_joint, _, _, _, test_loader_joint = self.task_loader.get_task(curr_session)
+            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device)
 
             self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
 
