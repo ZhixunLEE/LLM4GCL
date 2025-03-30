@@ -4,13 +4,14 @@ import yaml
 import torch
 import random
 import numpy as np
+import itertools
 from torch_geometric import seed_everything as pyg_seed 
 
 def load_config(dataset, model, file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         params = yaml.safe_load(file)
 
-    if dataset not in params.keys():
+    if dataset not in params.keys() or dataset == None:
         params = params['default']
     else:
         params = params[dataset]
@@ -81,3 +82,25 @@ def adjust_learning_rate(param_group, epoch, config):
         lr = float(config['min_lr']) + (float(config['lr']) - float(config['min_lr'])) * 0.5 * (1.0 + math.cos(math.pi * (epoch - config['warmup_epochs']) / (config['epochs'] - config['warmup_epochs'])))
     param_group["lr"] = lr
     return lr
+
+
+def select_hyperparameters(search_space, search_type, num_samples):
+    all_combinations = list(itertools.product(*search_space.values()))
+
+    if search_type == 'grid':
+        selected_params = {key: value for key, value in zip(search_space.keys(), all_combinations[0])}
+        return selected_params
+    
+    elif search_type == 'random':
+        selected_combinations = random.sample(all_combinations, num_samples)
+        selected_params = {key: value for key, value in zip(search_space.keys(), random.choice(selected_combinations))}
+        return selected_params
+    
+    else:
+        raise ValueError("Unsupported search type.")
+    
+
+def update_args_with_params(args, params):
+    for key, value in params.items():
+        setattr(args, key, value)
+    return args

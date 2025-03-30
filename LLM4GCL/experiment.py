@@ -5,7 +5,7 @@ from LLM4GCL.models import *
 import LLM4GCL.models as models
 from LLM4GCL.metric import CLMetric
 from LLM4GCL.data import TextDataset, TaskLoader
-from LLM4GCL.utils import load_config, seed_everything
+from LLM4GCL.utils import load_config, seed_everything, select_hyperparameters, update_args_with_params
 
 
 class Experiment(object):
@@ -31,6 +31,10 @@ class Experiment(object):
 
         # Load Model Configs
         self.config = load_config(self.dataset, self.model_name, args.config_path)
+        # if args.hyper_parameter_search:
+        #     search_space = load_config(None, self.model_name, args.search_space_path)
+        #     selected_params = select_hyperparameters(search_space, args.search_type, args.num_samples)
+        #     args = update_args_with_params(args, selected_params)
 
         # Genreate CL Tasks
         self.task_loader = TaskLoader(batch_size=self.config['batch_size'], 
