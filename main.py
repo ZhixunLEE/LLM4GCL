@@ -31,7 +31,7 @@ if __name__ == '__main__':
                             ' "LM": Use only Language Model (LM) for training and inference. '
                             ' "LM_emb": Use embeddings from a pre-trained Language Model (LM) to train the GNN. '
                             ' "Graph_LM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
-    parser.add_argument('--model', type=str, default='DeLoMe', help='the name of model, must match with the model_type')
+    parser.add_argument('--model', type=str, default='BareGNN', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
     parser.add_argument('--checkpoint_path', type=str, default='/root/autodl-tmp/checkpoint/', help='the path to store best model weights')
 
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_num', type=int, default=0, help='the selected GPU number')
 
     # Tuning
-    parser.add_argument('--hyper_parameter_search', action='store_true')
+    parser.add_argument('--hyperparameter_search', action='store_true')
     parser.add_argument('--search_type', type=str, default='grid', choices=['grid', 'random'])
     parser.add_argument('--num_samples', type=int, default=10)
 
@@ -55,7 +55,7 @@ if __name__ == '__main__':
 
     assert args.model in model_dict[args.model_type], f"Model type '{args.model_type}' does not support model '{args.model}'."
     assert args.split_ratio[0] + args.split_ratio[1] + args.split_ratio[2] <= 1, f"The sum of split ratio is larger than 1."
-    
+
     args.config_path = './LLM4GCL/configs/{}/{}.yaml'.format(args.model_type, args.model) # You should treat LLM4GCL as a library
     args.search_space_path = './search_space/{}/{}.yaml'.format(args.model_type, args.model)
 

@@ -86,18 +86,24 @@ def adjust_learning_rate(param_group, epoch, config):
 
 def select_hyperparameters(search_space, search_type, num_samples):
     all_combinations = list(itertools.product(*search_space.values()))
+    
+    search_results = []
 
     if search_type == 'grid':
-        selected_params = {key: value for key, value in zip(search_space.keys(), all_combinations[0])}
-        return selected_params
+        for combination in all_combinations:
+            selected_params = {key: value for key, value in zip(search_space.keys(), combination)}
+            search_results.append(selected_params)
     
     elif search_type == 'random':
         selected_combinations = random.sample(all_combinations, num_samples)
-        selected_params = {key: value for key, value in zip(search_space.keys(), random.choice(selected_combinations))}
-        return selected_params
+        for conbination in selected_combinations:
+            selected_params = {key: value for key, value in zip(search_space.keys(), conbination)}
+            search_results.append(selected_params)
     
     else:
         raise ValueError("Unsupported search type.")
+    
+    return search_results
     
 
 def update_args_with_params(args, params):

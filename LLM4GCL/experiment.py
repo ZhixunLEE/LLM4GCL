@@ -30,11 +30,11 @@ class Experiment(object):
         self.text_dataset = TextDataset(dataset=self.dataset, data_path=self.data_path)
 
         # Load Model Configs
-        self.config = load_config(self.dataset, self.model_name, args.config_path)
-        # if args.hyper_parameter_search:
-        #     search_space = load_config(None, self.model_name, args.search_space_path)
-        #     selected_params = select_hyperparameters(search_space, args.search_type, args.num_samples)
-        #     args = update_args_with_params(args, selected_params)
+        if args.hyperparameter_search:
+            search_space = load_config(None, self.model_name, args.search_space_path)
+            self.selected_params = select_hyperparameters(search_space, args.search_type, args.num_samples)
+        else:
+            self.config = load_config(self.dataset, self.model_name, args.config_path)
 
         # Genreate CL Tasks
         self.task_loader = TaskLoader(batch_size=self.config['batch_size'], 
