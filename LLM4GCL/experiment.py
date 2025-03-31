@@ -5,11 +5,11 @@ from LLM4GCL.models import *
 import LLM4GCL.models as models
 from LLM4GCL.metric import CLMetric
 from LLM4GCL.data import TextDataset, TaskLoader
-from LLM4GCL.utils import load_config, seed_everything, select_hyperparameters, update_args_with_params
+from LLM4GCL.utils import seed_everything
 
 
 class Experiment(object):
-    def __init__(self, args):
+    def __init__(self, args, config):
         self.dataset = args.dataset
         self.data_path = args.data_path
 
@@ -30,11 +30,7 @@ class Experiment(object):
         self.text_dataset = TextDataset(dataset=self.dataset, data_path=self.data_path)
 
         # Load Model Configs
-        if args.hyperparameter_search:
-            search_space = load_config(None, self.model_name, args.search_space_path)
-            self.selected_params = select_hyperparameters(search_space, args.search_type, args.num_samples)
-        else:
-            self.config = load_config(self.dataset, self.model_name, args.config_path)
+        self.config = config
 
         # Genreate CL Tasks
         self.task_loader = TaskLoader(batch_size=self.config['batch_size'], 
@@ -64,7 +60,7 @@ class Experiment(object):
                     model_name=self.model_name, 
                     seed=seed, 
                     device=self.device)
-            elif self.model_name in ['BareLM']:
+            elif self.model_name in ['BareLM', 'GraphPrompter', 'ENGINE']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
@@ -116,3 +112,4 @@ class Experiment(object):
         print(f"Jot. | Avg ACC: {avg_acc_jot_mean:.4f} ± {avg_acc_jot_std:.4f} | Last ACC: {last_acc_jot_mean:.4f} ± {last_acc_jot_std:.4f}")
         print(f"--------------------------------------------")
 
+        return avg_acc_iso_mean, avg_fgt_iso_mean, avg_acc_jot_mean, last_acc_jot_mean

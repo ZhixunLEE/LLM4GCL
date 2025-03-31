@@ -1,12 +1,15 @@
+import yaml
 import argparse
 
 from LLM4GCL.experiment import Experiment
+from LLM4GCL.utils import load_config, merge_params, update_config, select_hyperparameters
+
 
 model_dict = {
     'GNN': ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'CaT', 'DeLoMe', 'TPP'],
     'LM': ['BareLM'], 
     'LM_emb': [],
-    'Graph_LM': [], 
+    'Graph_LM': ['GraphPrompter', 'ENGINE'], 
 }
 
 if __name__ == '__main__':
@@ -46,18 +49,55 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_num', type=int, default=0, help='the selected GPU number')
 
     # Tuning
-    parser.add_argument('--hyperparameter_search', action='store_true')
+    parser.add_argument('--hyperparam_search', default=False, action='store_true')
     parser.add_argument('--search_type', type=str, default='grid', choices=['grid', 'random'])
     parser.add_argument('--num_samples', type=int, default=10)
 
     args = parser.parse_args()
 
-
     assert args.model in model_dict[args.model_type], f"Model type '{args.model_type}' does not support model '{args.model}'."
     assert args.split_ratio[0] + args.split_ratio[1] + args.split_ratio[2] <= 1, f"The sum of split ratio is larger than 1."
+    args.config_path = './configs/{}/{}.yaml'.format(args.model_type, args.model)
+    config = load_config(args.config_path)
 
-    args.config_path = './LLM4GCL/configs/{}/{}.yaml'.format(args.model_type, args.model) # You should treat LLM4GCL as a library
-    args.search_space_path = './search_space/{}/{}.yaml'.format(args.model_type, args.model)
+    if args.hyperparam_search:
 
-    exp = Experiment(args)
-    exp.run()
+        if 'default' not in config or 'search_space' not in config:
+            raise ValueError("Hyperparameter search requires the default and search_space sections in the config file")
+
+        default_params = config['default']
+        search_space = config['search_space']
+        selected_params = select_hyperparameters(search_space, args.search_type, args.num_samples)
+        
+        best_performance = -float('inf')
+        best_params = None
+        
+        for params in selected_params:
+
+            current_params = merge_params(default_params, params)
+            exp = Experiment(args, current_params)
+            avg_acc_iso_mean, avg_fgt_iso_mean, avg_acc_jot_mean, last_acc_jot_mean = exp.run()
+
+            if avg_acc_iso_mean + avg_fgt_iso_mean + avg_acc_jot_mean + last_acc_jot_mean > best_performance:
+                best_performance = avg_acc_iso_mean + avg_fgt_iso_mean + avg_acc_jot_mean + last_acc_jot_mean
+                best_params = params
+        
+        if best_params is not None:
+            metrics = {
+                'Iso. Avg ACC': "{:.4f}".format(avg_acc_iso_mean),
+                'Iso. Avg FGT': "{:.4f}".format(avg_fgt_iso_mean),
+                'Jot. Avg ACC': "{:.4f}".format(avg_acc_jot_mean),
+                'Jot. Last ACC': "{:.4f}".format(last_acc_jot_mean)
+            }
+            update_config(args.config_path, args.dataset, best_params, metrics)
+                
+    else:
+        if 'default' not in config:
+            raise ValueError("The config file must contain the default section")
+
+        final_params = config['default'].copy()
+        if 'best_' + args.dataset in config and config['best_' + args.dataset]:
+            final_params = merge_params(final_params, config['best_' + args.dataset])
+
+        exp = Experiment(args, final_params)
+        exp.run()

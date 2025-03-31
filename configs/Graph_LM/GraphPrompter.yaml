@@ -1,0 +1,34 @@
+default:
+  lm: 'RoBERTa'
+  seed: [0, 1, 2, 3, 4]
+  epochs: 20
+  valid_epoch: 1
+  warmup_epochs: 1
+  lr: 2e-4
+  min_lr: 5e-6
+  grad_steps: 2
+  weight_decay: 5e-2
+  dropout: 0.1
+  att_dropout: 0.1
+  patience: 5
+  batch_size: 10
+  max_length: 512
+
+  LoRA:
+    use_lora: True
+    target_modules: ["query", "value"]
+    lora_r: 5
+    lora_alpha: 16
+    lora_dropout: 0.05
+
+  GNN:
+    gnn: 'GCN'
+    layer_num: 4
+    hidden_dim: 1024
+    output_dim: 1024
+    dropout: 0.5
+    num_heads: 4 # only available for GATConv
+    aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
+
+  Projector:
+    hidden_dim: 1024

@@ -1,0 +1,26 @@
+default:
+  lm: 'RoBERTa'
+  seed: [0, 1, 2, 3, 4]
+  cache: '/root/autodl-tmp/cache/'
+  lr: 5e-5
+  weight_decay: 5e-4
+  epochs: 500
+  valid_epoch: 10
+  patience: 20
+  batch_size: 256
+  cache_batch_size: 10
+  max_length: 512
+  layer_select: [0,5,10,15,20,-1]
+  T: 0.1
+  r: 32
+
+  GNN:
+    gnn: 'GCN'
+    layer_num: 1
+    hidden_dim: 64
+    dropout: 0.5
+    num_heads: 4 # only available for GATConv
+    aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
+
+
+

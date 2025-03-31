@@ -24,6 +24,7 @@ class RoBERTaNet(torch.nn.Module):
         model.config.dropout = self.dropout
         model.config.attention_dropout = self.att_dropout
         model.config.output_hidden_states = True
+        self.embeddings = model.get_input_embeddings()
 
         if lora_config['use_lora']:
             self.target_modules = self.lora_config['target_modules']
@@ -41,13 +42,17 @@ class RoBERTaNet(torch.nn.Module):
         else:
             self.model = model
 
-    def forward(self, input_ids, attention_mask):
-
+    def forward(self, input, attention_mask):
+        if input.dtype in (torch.int32, torch.int64) and input.dim() == 2:  # shape: [batch_size, seq_len]
+            kwargs = {"input_ids": input}
+        else:
+            kwargs = {"inputs_embeds": input}
+        
         outputs = self.model(
-            input_ids=input_ids,
+            **kwargs,
             attention_mask=attention_mask,
             return_dict=True,
         )
-
+        
         return outputs.logits, outputs.hidden_states
 

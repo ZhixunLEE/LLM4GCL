@@ -16,3 +16,6 @@ from .GNN.DeLoMe import DeLoMe
 from .GNN.TPP import TPP
 
 from .LM.BareLM import BareLM
+
+from .Graph_LLM.GraphPrompter import GraphPrompter
+from .Graph_LLM.ENGINE import ENGINE
