@@ -13,10 +13,17 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  CaT:
-    budget: 0.01
-    feat_init: 'randomChoice'
-    feat_lr: 1e-4
-    hid_dim: 512
-    emb_dim: 256
-    n_encoders: 1000
+  cat_budget: 0.01
+  cat_feat_init: 'randomChoice'
+  cat_feat_lr: 1e-4
+  cat_hid_dim: 512
+  cat_emb_dim: 256
+  cat_n_encoders: 1000
+search_space:
+  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-4, 1e-3]
+  hidden_dim: [128, 256]
+  cat_budget: [0.01, 0.05, 0.1]
+  cat_feat_lr: [1e-4, 1e-3]
+  cat_hid_dim: [256, 512]
+  cat_emb_dim: [256, 512]

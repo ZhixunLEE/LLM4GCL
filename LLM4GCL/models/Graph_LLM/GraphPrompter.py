@@ -45,14 +45,14 @@ class GraphPrompterComponent(nn.Module):
         self.embeddings = self.lm_model.lm.embeddings
 
         # GNN Params
-        self.gnn_type = config['GNN']['gnn']
+        self.gnn_type = config['gp_gnn']
         self.gnn_input_dim = feat_dim
-        self.gnn_hidden_dim = config['GNN']['hidden_dim']
-        self.gnn_output_dim = config['GNN']['output_dim']
-        self.gnn_layer_num = config['GNN']['layer_num']
-        self.gnn_dropout = config['GNN']['dropout']
-        self.gnn_num_heads = config['GNN']['num_heads']
-        self.gnn_aggr = config['GNN']['aggr']
+        self.gnn_hidden_dim = config['gp_hidden_dim']
+        self.gnn_output_dim = config['gp_output_dim']
+        self.gnn_layer_num = config['gp_layer_num']
+        self.gnn_dropout = config['gp_dropout']
+        self.gnn_num_heads = config['gp_num_heads']
+        self.gnn_aggr = config['gp_aggr']
 
         class GNNModel(nn.Module):
 
@@ -74,7 +74,7 @@ class GraphPrompterComponent(nn.Module):
         self.gnn_encoder = GNNModel(self.gnn_type, self.gnn_input_dim, self.gnn_hidden_dim, self.gnn_output_dim, self.gnn_layer_num, self.gnn_dropout, self.gnn_num_heads, self.gnn_aggr, self.device)
         
         # Proj Params
-        self.proj_hidden_dim = config['Projector']['hidden_dim']
+        self.proj_hidden_dim = config['gp_proj_hidden_dim']
         self.projector = nn.Sequential(
             nn.Linear(self.gnn_output_dim, self.proj_hidden_dim),
             nn.Sigmoid(),
@@ -150,7 +150,13 @@ class GraphPrompter(BaseModel):
                 break
             optimizer.zero_grad()
             logits = model(batch, text_dataset.data)
-            loss = self.loss_func(logits[:, : class_num], batch['labels'].cuda())
+            labels = batch['labels'].to(self.device)
+
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
+
+            loss = self.loss_func(logits[:, : class_num], labels, loss_w)
             loss.backward()
 
             clip_grad_norm_(optimizer.param_groups[0]['params'], 0.1)

@@ -62,8 +62,11 @@ class BareGNN(BaseModel):
 
             logits = logits[:, :class_num]
             labels = batch['labels'].to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
             loss.backward()
             optimizer.step()
             all_loss += loss * batch['node_id'].size(0)

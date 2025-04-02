@@ -1,7 +1,7 @@
 default:
   lm: 'RoBERTa'
   seed: [0, 1, 2, 3, 4]
-  cache: '/root/autodl-tmp/cache/'
+  cache: '/root/autodl-tmp/hidden_states/'
   lr: 5e-5
   weight_decay: 5e-4
   epochs: 500
@@ -10,17 +10,20 @@ default:
   batch_size: 256
   cache_batch_size: 10
   max_length: 512
-  layer_select: [0,5,10,15,20,-1]
-  T: 0.1
-  r: 32
 
-  GNN:
-    gnn: 'GCN'
-    layer_num: 1
-    hidden_dim: 64
-    dropout: 0.5
-    num_heads: 4 # only available for GATConv
-    aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
+  gnn: 'GCN'
+  layer_num: 1
+  hidden_dim: 64
+  dropout: 0.5
+  num_heads: 4 # only available for GATConv
+  aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-
-
+  engine_layer_select: [0,5,10,15,20,-1]
+  engine_T: 0.1
+  engine_r: 32
+search_space:
+  lr: [1e-5, 5e-5, 1e-4]
+  gnn: ['GCN', 'GAT', 'SAGE']
+  hidden_dim: [64, 128, 256]
+  engine_r: [1, 8, 32]
+  # engine_layer_select: [0,5,10,15,20,-1]

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 
 from LLM4GCL.models import BareGNN
-from LLM4GCL.backbones import GCNNet, GATNet, SAGENet
+from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
 from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
@@ -59,10 +59,10 @@ class ERGNN(BareGNN):
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
         super(ERGNN, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
 
-        self.sampler = samplers[config['ERGNN']['sampler']]
+        self.sampler = samplers[config['ergnn_sampler']]
         self.buffer_node_ids = []
-        self.budget = int(config['ERGNN']['budget'])
-        self.d_CM = float(config['ERGNN']['d']) # d for CM sampler of ERGNN
+        self.budget = int(config['ergnn_budget'])
+        self.d_CM = float(config['ergnn_d']) # d for CM sampler of ERGNN
 
         class GNNModel(nn.Module):
 
@@ -149,13 +149,21 @@ class ERGNN(BareGNN):
 
             logits = logits[mapping][:, :class_num]
             labels = batch['labels'].to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
 
             if curr_session != 0:
-                output, _ = self.model(self.aux_feats, self.aux_edge_index)
-                logits = output[self.aux_mapping][:, :class_num]
-                loss_aux = self.loss_func(logits, self.aux_labels)
+                aux_output, _ = self.model(self.aux_feats, self.aux_edge_index)
+                aux_logits = aux_output[self.aux_mapping][:, :class_num]
+                
+                aux_n_per_cls = [(self.aux_labels == j).sum() for j in range(self.num_class)]
+                aux_loss_w = [1. / max(i, 1) for i in aux_n_per_cls]
+                aux_loss_w = torch.tensor(aux_loss_w[:class_num]).to(self.device)
+
+                loss_aux = self.loss_func(aux_logits, self.aux_labels, aux_loss_w)
                 loss = beta * loss + (1 - beta) * loss_aux
 
             loss.backward()
@@ -207,7 +215,7 @@ class ERGNN(BareGNN):
             class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):

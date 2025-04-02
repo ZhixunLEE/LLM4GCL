@@ -76,14 +76,14 @@ class CaT(BareGNN):
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
         super(CaT, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
 
-        self.feat_init = config['CaT']["feat_init"]
+        self.feat_init = config["cat_feat_init"]
         self.memory_bank = []
-        self.budgets = self.assign_buget_per_cls(int(config['CaT']["budget"] * self.task_loader.data.x.shape[0]))
-        self.feat_lr = float(config['CaT']["feat_lr"])
+        self.budgets = self.assign_buget_per_cls(int(config["cat_budget"] * self.task_loader.data.x.shape[0]))
+        self.feat_lr = float(config["cat_feat_lr"])
         self.hidden_dim = config['hidden_dim']
-        self.emb_dim = config['CaT']["emb_dim"]
+        self.emb_dim = config["cat_emb_dim"]
         self.layer_num = config['layer_num']
-        self.n_encoders = config['CaT']["n_encoders"]
+        self.n_encoders = config["cat_n_encoders"]
 
 
     def assign_buget_per_cls(self, budget):
@@ -211,8 +211,11 @@ class CaT(BareGNN):
 
             logits = logits[:, :class_num]
             labels = memory_data.y.to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
             loss.backward()
             optimizer.step()
             all_loss += loss
@@ -234,10 +237,10 @@ class CaT(BareGNN):
             if curr_session != 0:
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
 
-            class_num, _, text_dataset_joint, _, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
+            class_num, text_dataset_iso, text_dataset_joint, _, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):

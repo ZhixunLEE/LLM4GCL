@@ -23,8 +23,8 @@ class LwF(BareGNN):
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
         super(LwF, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
         
-        self.lambda_dist = config['LwF']['lambda']
-        self.T = config['LwF']['T']
+        self.lambda_dist = config['lwf_lambda']
+        self.T = config['lwf_T']
         self.prev_model = None
 
     def lwf_train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
@@ -42,12 +42,15 @@ class LwF(BareGNN):
 
             logits = output[:, :class_num]
             labels = batch['labels'].to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
 
             class_num_offset = 0
             for s in range(curr_session):
-                old_class_num, _, _, _, _, _ = self.task_loader.get_task(s)
+                old_class_num, _, _, _, _, _, _ = self.task_loader.get_task(s)
                 output_dist = output[:, class_num_offset : old_class_num]
                 prev_output_dist = prev_output[:, class_num_offset : old_class_num]
                 loss_dist = MultiClassCrossEntropy(output_dist, prev_output_dist, self.T)
@@ -72,7 +75,7 @@ class LwF(BareGNN):
             class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):

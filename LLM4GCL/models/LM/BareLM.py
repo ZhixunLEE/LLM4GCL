@@ -45,9 +45,9 @@ class BareLM(BaseModel):
                 tokens = self.lm.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 tokens['input_ids'] = tokens['input_ids'].to(self.device)
                 tokens['attention_mask'] = tokens['attention_mask'].to(self.device)
-                # _, hidden_states = self.lm(**tokens)
-                # logits = self.fc(hidden_states[-1][:, 0, :])
-                logits, _ = self.lm(**tokens)
+                _, hidden_states = self.lm(tokens['input_ids'], tokens['attention_mask'])
+                logits = self.fc(hidden_states[-1][:, 0, :])
+                # logits, _ = self.lm(tokens['input_ids'], tokens['attention_mask'])
 
                 return logits
             
@@ -71,7 +71,13 @@ class BareLM(BaseModel):
                 break
             optimizer.zero_grad()
             logits = model(batch)
-            loss = self.loss_func(logits[:, : class_num], batch['labels'].cuda())
+            labels = batch['labels'].to(self.device)
+
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
+
+            loss = self.loss_func(logits[:, : class_num], labels, loss_w)
             loss.backward()
 
             clip_grad_norm_(optimizer.param_groups[0]['params'], 0.1)
@@ -100,7 +106,7 @@ class BareLM(BaseModel):
             if batch['node_id'].size(0) < 2:
                 break
             logits = model(batch)
-            logits = logits[:, : class_num]
+            logits = torch.softmax(logits[:, : class_num], dim=1)
             preds = torch.argmax(logits, dim=1)
             labels = batch['labels']
 
@@ -115,3 +121,4 @@ class BareLM(BaseModel):
         acc, f1 = self.get_metric(logits, preds, labels)
 
         return acc, f1
+    

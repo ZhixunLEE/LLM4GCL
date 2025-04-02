@@ -7,9 +7,8 @@ from LLM4GCL.utils import load_config, merge_params, update_config, select_hyper
 
 model_dict = {
     'GNN': ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'CaT', 'DeLoMe', 'TPP'],
-    'LM': ['BareLM'], 
-    'LM_emb': [],
-    'Graph_LM': ['GraphPrompter', 'ENGINE'], 
+    'LM': ['BareLM', 'SimpleCIL', 'OLoRA'], 
+    'Graph_LM': ['LM_emb', 'GraphPrompter', 'ENGINE'], 
 }
 
 if __name__ == '__main__':
@@ -27,14 +26,13 @@ if __name__ == '__main__':
     # Model
     parser.add_argument('--model_type', 
                         type=str, 
-                        default='GNN', 
-                        choices=['GNN', 'LM', 'LM_emb', 'Graph_LM'], 
+                        default='LM', 
+                        choices=['GNN', 'LM', 'Graph_LM'], 
                         help='Specify the type of model to use. '
                             ' "GNN": Use only Graph Neural Network (GNN) for training and inference. '
                             ' "LM": Use only Language Model (LM) for training and inference. '
-                            ' "LM_emb": Use embeddings from a pre-trained Language Model (LM) to train the GNN. '
                             ' "Graph_LM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
-    parser.add_argument('--model', type=str, default='BareGNN', help='the name of model, must match with the model_type')
+    parser.add_argument('--model', type=str, default='OLoRA', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
     parser.add_argument('--checkpoint_path', type=str, default='/root/autodl-tmp/checkpoint/', help='the path to store best model weights')
 
@@ -71,6 +69,7 @@ if __name__ == '__main__':
         
         best_performance = -float('inf')
         best_params = None
+        best_metric = None
         
         for params in selected_params:
 
@@ -81,15 +80,15 @@ if __name__ == '__main__':
             if avg_acc_iso_mean + avg_fgt_iso_mean + avg_acc_jot_mean + last_acc_jot_mean > best_performance:
                 best_performance = avg_acc_iso_mean + avg_fgt_iso_mean + avg_acc_jot_mean + last_acc_jot_mean
                 best_params = params
+                best_metric = {
+                    'Iso. Avg ACC': "{:.4f}".format(avg_acc_iso_mean),
+                    'Iso. Avg FGT': "{:.4f}".format(avg_fgt_iso_mean),
+                    'Jot. Avg ACC': "{:.4f}".format(avg_acc_jot_mean),
+                    'Jot. Last ACC': "{:.4f}".format(last_acc_jot_mean)
+                }
         
-        if best_params is not None:
-            metrics = {
-                'Iso. Avg ACC': "{:.4f}".format(avg_acc_iso_mean),
-                'Iso. Avg FGT': "{:.4f}".format(avg_fgt_iso_mean),
-                'Jot. Avg ACC': "{:.4f}".format(avg_acc_jot_mean),
-                'Jot. Last ACC': "{:.4f}".format(last_acc_jot_mean)
-            }
-            update_config(args.config_path, args.dataset, best_params, metrics)
+        if best_params is not None and best_metric is not None:
+            update_config(args.config_path, args.dataset, best_params, best_metric)
                 
     else:
         if 'default' not in config:

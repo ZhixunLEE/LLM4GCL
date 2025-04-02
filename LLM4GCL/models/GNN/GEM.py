@@ -62,8 +62,8 @@ class GEM(BareGNN):
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
         super(GEM, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
 
-        self.margin = config['GEM']['strength']
-        self.n_mem = int(config['GEM']['n_mem'])
+        self.margin = config['gem_strength']
+        self.n_mem = int(config['gem_n_mem'])
 
         self.memory_data = []
 
@@ -89,7 +89,7 @@ class GEM(BareGNN):
         for old_task_idx in self.observed_tasks[:-1]:
             old_task_loss = 0
             
-            (old_class_num, old_text_dataset, old_train_loader, _, _, _) = self.old_dataloaders[old_task_idx]
+            (old_class_num, old_text_dataset, _, old_train_loader, _, _, _) = self.old_dataloaders[old_task_idx]
             old_data = old_text_dataset.data
 
             for _, batch in enumerate(old_train_loader):
@@ -102,8 +102,11 @@ class GEM(BareGNN):
 
                 logits = logits[:, :old_class_num]
                 labels = batch['labels'].to(device)
+                n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+                loss_w = [1. / max(i, 1) for i in n_per_cls]
+                loss_w = torch.tensor(loss_w[:old_class_num]).to(self.device)
 
-                loss = self.loss_func(logits, labels)
+                loss = self.loss_func(logits, labels, loss_w)
 
                 old_task_loss = old_task_loss + loss
             old_task_loss.backward()
@@ -122,8 +125,11 @@ class GEM(BareGNN):
 
             logits = logits[:, :class_num]
             labels = batch['labels'].to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
             loss.backward()
 
             all_loss += loss * batch['node_id'].size(0)
@@ -162,7 +168,7 @@ class GEM(BareGNN):
             class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):

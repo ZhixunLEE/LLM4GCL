@@ -13,6 +13,10 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  cosine:
-    T: 1.0
-    sample_num: 100
+  cosine_T: 1.0
+  cosine_sample_num: 100
+search_space:
+  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3]
+  hidden_dim: [128, 256]
+

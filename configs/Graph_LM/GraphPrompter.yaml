@@ -21,14 +21,15 @@ default:
     lora_alpha: 16
     lora_dropout: 0.05
 
-  GNN:
-    gnn: 'GCN'
-    layer_num: 4
-    hidden_dim: 1024
-    output_dim: 1024
-    dropout: 0.5
-    num_heads: 4 # only available for GATConv
-    aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
-
-  Projector:
-    hidden_dim: 1024
+  gp_gnn: 'GCN'
+  gp_layer_num: 4
+  gp_hidden_dim: 1024
+  gp_output_dim: 1024
+  gp_dropout: 0.5
+  gp_num_heads: 4 # only available for GATConv
+  gp_aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
+  gp_proj_hidden_dim: 1024
+search_space:
+  lr: [1e-4, 1e-3]
+  gp_gnn: ['GCN', 'GAT', 'SAGE']
+  gp_layer_num: [2, 4]

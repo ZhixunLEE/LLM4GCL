@@ -72,11 +72,11 @@ def distance_wb(gwr, gws):
 class GCondenser():
 
     def __init__(self, curr_session, class_num, ids_per_cls_train, input_dim, hidden_dim, output_dim, num_layers, dropout, graph, config, device):
-        self.budget = config['DeLoMe']['budget']
-        self.epochs = config['DeLoMe']['epochs']
-        self.batch_size = config['DeLoMe']['batch_size']
-        self.feat_lr = config['DeLoMe']['feat_lr']
-        self.layer_size = config['DeLoMe']['layer_size']
+        self.budget = config['delome_budget']
+        self.epochs = config['delome_epochs']
+        self.batch_size = config['delome_batch_size']
+        self.feat_lr = float(config['delome_feat_lr'])
+        self.layer_size = config['delome_layer_size']
 
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
@@ -208,8 +208,8 @@ class DeLoMe(BareGNN):
         
         self.current_task = -1
         self.cond_num = {}
-        self.budget = int(config['DeLoMe']['budget'])
-        self.tro = config['DeLoMe']['tro']
+        self.budget = int(config['delome_budget'])
+        self.tro = config['delome_tro']
         self.aux_g = []
         self.adjustments = 0
         self.aux_loss_w_ = []
@@ -261,8 +261,11 @@ class DeLoMe(BareGNN):
 
             logits = logits[:, :class_num] + self.adjustments[ :class_num]
             labels = batch['labels'].to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).double().to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
 
             if curr_session != 0:
                 for old_session in range(curr_session):
@@ -271,7 +274,11 @@ class DeLoMe(BareGNN):
                     aux_logits = aux_logits[:, :class_num] + self.adjustments[ :class_num]
                     aux_labels = aux_g.y.to(device)
 
-                    loss_aux = self.loss_func(aux_logits, aux_labels)
+                    aux_n_per_cls = [(aux_labels == j).sum() for j in range(self.num_class)]
+                    aux_loss_w = [1. / max(i, 1) for i in aux_n_per_cls]
+                    aux_loss_w = torch.tensor(aux_loss_w[:class_num]).double().to(self.device)
+
+                    loss_aux = self.loss_func(aux_logits, aux_labels, aux_loss_w)
                     loss = loss + loss_aux
 
             loss.backward()

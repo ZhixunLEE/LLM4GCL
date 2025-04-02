@@ -13,5 +13,10 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  MAS:
-    strength: 1 # [1, 100, 10000, 1000000]
+  strength: 1
+search_space:
+  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3, 1e-2]
+  hidden_dim: [128, 256]
+
+  mas_strength: [1, 100, 10000, 1000000]

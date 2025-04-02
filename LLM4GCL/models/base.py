@@ -29,8 +29,8 @@ class BaseModel(nn.Module):
         optimizer = optim.Adam(model.parameters(), lr=float(self.config['lr']), weight_decay=float(self.config['weight_decay']))
         return optimizer
     
-    def loss_func(self, logits, labels):
-        loss = F.cross_entropy(logits, labels)
+    def loss_func(self, logits, labels, loss_weight=None):
+        loss = F.cross_entropy(logits, labels, weight=loss_weight)
         return loss
 
     def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
@@ -54,7 +54,7 @@ class BaseModel(nn.Module):
             class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):

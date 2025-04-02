@@ -12,3 +12,7 @@ default:
   batch_size: 256
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
+search_space:
+  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3, 1e-2]
+  hidden_dim: [64, 128, 256]

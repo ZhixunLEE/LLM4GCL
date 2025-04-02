@@ -13,17 +13,7 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 search_space:
-  # lr: [1e-5, 1e-4, 1e-3, 1e-2]
-  # hidden_dim: [64, 128, 256]
-  lr: [1e-5]
-  hidden_dim: [64]
-best_cora:
-  lr: '1e-5'
-  hidden_dim: 64
-  _meta:
-    updated_at: '2025-03-31T17:00:03.334820'
-    metrics:
-      Iso. Avg ACC: '0.2920'
-      Iso. Avg FGT: '-0.9462'
-      Jot. Avg ACC: '0.5172'
-      Jot. Last ACC: '0.2181'
+  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3, 1e-2]
+  hidden_dim: [64, 128, 256]
+

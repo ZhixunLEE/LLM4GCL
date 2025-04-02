@@ -4,13 +4,13 @@ default:
   epochs: 20
   valid_epoch: 1
   warmup_epochs: 1
-  lr: 2e-4
+  lr: 5e-4
   min_lr: 5e-6
   grad_steps: 2
   weight_decay: 5e-2
   dropout: 0.1
   att_dropout: 0.1
-  patience: 5
+  patience: 10
   batch_size: 10
   max_length: 512
   LoRA:
@@ -19,5 +19,10 @@ default:
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05
+
+  olora_ortho_lambda: 0.1
+  olora_l2_lambda: 0.0
 search_space:
-  lr: [1e-4, 2e-4, 5e-4, 1e-3]
+  lr: [1e-4, 1e-3]
+  olora_ortho_lambda: [0.1, 0.5]
+  olora_l2_lambda: [0.0, 0.5]

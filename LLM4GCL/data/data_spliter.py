@@ -20,7 +20,7 @@ class TaskLoader():
 
         if self.cl_type == 'class':
             if self.task_type == 'normal':
-                self.task_num = self.data.y.max().item() // self.session_size
+                self.task_num = (self.data.y.max().item() + 1) // self.session_size
 
         # Task Split
         train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint = self._split_data()

@@ -81,9 +81,9 @@ class SSM(BareGNN):
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device):
         super(SSM, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
 
-        self.sampler = samplers[config['SSM']['sampler']]
-        self.c_node_budget = config['SSM']['c_node_budget']
-        self.nei_budget = config['SSM']['nei_budget']
+        self.sampler = samplers[config['ssm_sampler']]
+        self.c_node_budget = config['ssm_c_node_budget']
+        self.nei_budget = config['ssm_nei_budget']
         self.current_task = -1
         self.buffer_c_node = []
         self.buffer_all_nodes = []
@@ -136,8 +136,11 @@ class SSM(BareGNN):
 
             logits = logits[:, :class_num]
             labels = batch['labels'].to(device)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
 
-            loss = self.loss_func(logits, labels)
+            loss = self.loss_func(logits, labels, loss_w)
             loss.backward()
             optimizer.step()
 

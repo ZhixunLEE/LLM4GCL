@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet, RoBERTaNet
+from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
 from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
@@ -29,7 +29,7 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
     batch_size = batch_size
     model.eval()
     layers = [[] for i in range(hidden_layers + 1)]
-    for i in tqdm(range(math.ceil(len(text) / batch_size))):
+    for i in tqdm(range(math.ceil(len(text) / batch_size)), desc='Generating embeds'):
         if (i + 1) * batch_size <= len(text):
             txt = text[(i) * batch_size: (i + 1) * batch_size]
         else:
@@ -117,23 +117,23 @@ class ENGINEComponent(nn.Module):
 
         self.num_class = num_class
         self.device = device
-        self.layer_select = config['layer_select']
-        self.T = config['T']
-        self.r = config['r']
+        self.layer_select = config['engine_layer_select']
+        self.T = config['engine_T']
+        self.r = config['engine_r']
 
         self.k = int(lm_hidden_dim / self.r)
         self.proj_input_dim = lm_hidden_dim
         self.proj_hidden_dim = self.k
         self.proj_output_dim = self.k
 
-        self.gnn_type = config['GNN']['gnn']
+        self.gnn_type = config['gnn']
         self.gnn_input_dim = self.k
-        self.gnn_hidden_dim = config['GNN']['hidden_dim']
+        self.gnn_hidden_dim = config['hidden_dim']
         self.gnn_output_dim = self.k
-        self.gnn_layer_num = config['GNN']['layer_num']
-        self.gnn_dropout = config['GNN']['dropout']
-        self.gnn_num_heads = config['GNN']['num_heads']
-        self.gnn_aggr = config['GNN']['aggr']
+        self.gnn_layer_num = config['layer_num']
+        self.gnn_dropout = config['dropout']
+        self.gnn_num_heads = config['num_heads']
+        self.gnn_aggr = config['aggr']
 
         class GNNModel(nn.Module):
 
@@ -214,7 +214,7 @@ class ENGINE(BaseModel):
 
         self.cache_path = config['cache']
         self.cache_batch_size = config['cache_batch_size']
-        self.layer_select = config['layer_select']
+        self.layer_select = config['engine_layer_select']
 
     def get_optimizer(self, model):
         optimizer = torch.optim.Adam([
@@ -233,7 +233,13 @@ class ENGINE(BaseModel):
                 break
             optimizer.zero_grad()
             logits = model(hidden_embeds, batch, text_dataset.data)
-            loss = self.loss_func(logits[:, : class_num], batch['labels'].cuda())
+            labels = batch['labels'].to(self.device)
+
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
+
+            loss = self.loss_func(logits[:, : class_num], labels, loss_w)
             loss.backward()
             optimizer.step()
             all_loss += loss * batch['node_id'].size(0)
@@ -290,7 +296,7 @@ class ENGINE(BaseModel):
             class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):

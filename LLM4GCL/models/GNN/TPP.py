@@ -203,14 +203,14 @@ class TPP(BareGNN):
         super(TPP, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
 
         self.grace_config = {
-            'batch_size': config['TPP']['grace']['batch_size'],
-            'drop_edge': config['TPP']['grace']['pe'],
-            'drop_feature': config['TPP']['grace']['pf'],
-            'epochs': config['TPP']['grace']['epochs'],
-            'lr': float(config['TPP']['grace']['lr']),
+            'batch_size': config['tpp_grace_batch_size'],
+            'drop_edge': config['tpp_grace_pe'],
+            'drop_feature': config['tpp_grace_pf'],
+            'epochs': config['tpp_grace_epochs'],
+            'lr': float(config['tpp_grace_lr']),
         }
 
-        num_promt = int(config['TPP']['prompts'])
+        num_promt = int(config['tpp_prompts'])
 
         if num_promt < 2:
             prompt = SimplePrompt(self.feat_dim).to(device)
@@ -281,7 +281,7 @@ class TPP(BareGNN):
         return taskid.numpy()        
     
 
-    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_offset, config, device):
+    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_offset, class_num, config, device):
         model.eval()
         data = text_dataset.data
         cls_head = self.classifiers[curr_session]
@@ -310,7 +310,11 @@ class TPP(BareGNN):
             logits = cls_head(embeds)
             labels = batch['labels'].to(device) - class_offset
 
-            loss = self.loss_func(logits, labels)
+            n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
+            loss_w = [1. / max(i, 1) for i in n_per_cls]
+            loss_w = torch.tensor(loss_w[class_offset : class_num]).to(self.device)
+
+            loss = self.loss_func(logits, labels, loss_w)
             loss.backward()
             optimizer.step()
             all_loss += loss * batch['node_id'].size(0)
@@ -390,11 +394,11 @@ class TPP(BareGNN):
                 self.pretrain(subgraph)
 
             progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+            progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):
-                loss = self.train(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_offset, self.config, self.device)
+                loss = self.train(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_offset, class_num, self.config, self.device)
                 progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
 
                 if epoch > 0 and epoch % self.config['valid_epoch'] == 0:

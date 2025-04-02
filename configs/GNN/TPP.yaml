@@ -13,11 +13,16 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  TPP:
-    prompts: 3
-    grace:
-      pe: 0.2
-      pf: 0.3
-      epochs: 500
-      lr: 1e-3
-      batch_size: 500
+  tpp_prompts: 3
+
+  tpp_grace_pe: 0.2
+  tpp_grace_pf: 0.3
+  tpp_grace_epochs: 500
+  tpp_grace_lr: 1e-3
+  tpp_grace_batch_size: 500
+search_space:
+  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-4, 1e-3]
+  hidden_dim: [128, 256]
+  tpp_grace_pe: [0.2, 0.3, 0.4]
+  tpp_grace_pf: [0.2, 0.3, 0.4]

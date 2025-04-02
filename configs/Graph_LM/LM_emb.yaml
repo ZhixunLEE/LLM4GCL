@@ -1,5 +1,5 @@
 default:
-  gnn: 'GCN'
+  gnn: 'SAGE'
   seed: [0, 1, 2, 3, 4]
   epochs: 300
   valid_epoch: 10
@@ -13,13 +13,22 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  ssm_sampler: 'degree' # ['uniform', 'degree']
-  ssm_c_node_budget: 10
-  ssm_nei_budget: [0, 0]
-  ssm_lambda: 1
+  lm: 'RoBERTa'
+  cache: '/root/autodl-tmp/hidden_embs/'
+  cache_batch_size: 30
+  max_length: 512
 search_space:
   gnn: ['GCN', 'GAT', 'SAGE']
   lr: [1e-5, 1e-4, 1e-3, 1e-2]
   hidden_dim: [128, 256]
-
-  ssm_c_node_budget: [10, 50, 100]
+best_cora:
+  gnn: GAT
+  lr: '1e-3'
+  hidden_dim: 128
+  _meta:
+    updated_at: '2025-04-02T16:44:15.909785'
+    metrics:
+      Iso. Avg ACC: '0.3333'
+      Iso. Avg FGT: '-0.6482'
+      Jot. Avg ACC: '0.3335'
+      Jot. Last ACC: '0.2467'
