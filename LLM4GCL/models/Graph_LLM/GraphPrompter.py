@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet, RoBERTaNet
+from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet, RoBERTaNet, LLaMANet
 from LLM4GCL.utils import adjust_learning_rate
 
 from torch.nn.utils import clip_grad_norm_
@@ -17,6 +17,8 @@ class GraphPrompterComponent(nn.Module):
         self.lm_type = config['lm']
         if self.lm_type == 'RoBERTa':
             self.lm_hidden_dim = 1024
+        elif self.lm_type == 'LLaMA':
+            self.lm_hidden_dim = 4096
         self.output_dim = num_class
         self.lora_config = config['LoRA']
         self.lm_dropout = config['dropout']
@@ -34,11 +36,13 @@ class GraphPrompterComponent(nn.Module):
                 
                 if lm_type == 'RoBERTa':
                     self.lm = RoBERTaNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
+                elif lm_type == 'LLaMA':
+                    self.lm = LLaMANet(max_length, output_dim, model_path, lora_config, dropout, att_dropout).to(device)
 
             def forward(self, inputs_embeds, attention_mask):
-                _, hidden_embeds = self.lm(inputs_embeds, attention_mask)
+                hidden_embeds = self.lm(inputs_embeds, attention_mask)
 
-                return hidden_embeds[-1][:, 0, :]
+                return hidden_embeds
             
         self.lm_model = LMModel(self.lm_type, self.max_length, self.model_path, self.lm_hidden_dim, self.output_dim, self.lora_config, self.lm_dropout, self.att_dropout, self.device)
         self.tokenizer = self.lm_model.lm.tokenizer
@@ -102,19 +106,19 @@ class GraphPrompterComponent(nn.Module):
         batch_size = len(samples['node_id'])
         batch_inputs_embeds = []
         batch_attention_mask = []
-        if self.lm_type == 'RoBERTa':
-            for i in range(batch_size):
-                inputs = self.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
-                inputs_embeds = self.embeddings(inputs['input_ids'][i][:self.max_length - 1].to(self.device))
-                inputs_embeds = torch.cat([inputs_embeds[:1], graph_embeds[i].unsqueeze(0), inputs_embeds[1:]], dim=0)
 
-                batch_inputs_embeds.append(inputs_embeds)
-                batch_attention_mask.append(torch.cat([torch.tensor([1]).to(self.device), inputs['attention_mask'][i][:self.max_length - 1].to(self.device)]))
+        for i in range(batch_size):
+            inputs = self.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
+            inputs_embeds = self.embeddings(inputs['input_ids'][i][:self.max_length - 1].to(self.device))
+            inputs_embeds = torch.cat([inputs_embeds[:1], graph_embeds[i].unsqueeze(0), inputs_embeds[1:]], dim=0)
+
+            batch_inputs_embeds.append(inputs_embeds)
+            batch_attention_mask.append(torch.cat([torch.tensor([1]).to(self.device), inputs['attention_mask'][i][:self.max_length - 1].to(self.device)]))
 
         inputs_embeds = torch.stack(batch_inputs_embeds, dim=0).to(self.device)
         attention_mask = torch.stack(batch_attention_mask, dim=0).to(self.device)
 
-        outputs = self.lm_model(inputs_embeds, attention_mask)
+        outputs = self.lm_model(inputs_embeds.half(), attention_mask.half())
         logits = self.fc(outputs)
 
         return logits

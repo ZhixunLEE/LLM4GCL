@@ -26,13 +26,13 @@ if __name__ == '__main__':
     # Model
     parser.add_argument('--model_type', 
                         type=str, 
-                        default='LM', 
+                        default='Graph_LM', 
                         choices=['GNN', 'LM', 'Graph_LM'], 
                         help='Specify the type of model to use. '
                             ' "GNN": Use only Graph Neural Network (GNN) for training and inference. '
                             ' "LM": Use only Language Model (LM) for training and inference. '
                             ' "Graph_LM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
-    parser.add_argument('--model', type=str, default='OLoRA', help='the name of model, must match with the model_type')
+    parser.add_argument('--model', type=str, default='ENGINE', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
     parser.add_argument('--checkpoint_path', type=str, default='/root/autodl-tmp/checkpoint/', help='the path to store best model weights')
 

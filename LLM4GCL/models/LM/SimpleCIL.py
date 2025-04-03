@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import RoBERTaNet
+from LLM4GCL.backbones import RoBERTaNet, LLaMANet
 from LLM4GCL.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
@@ -17,6 +17,8 @@ class SimpleCIL(BaseModel):
         self.lm_type = config['lm']
         if self.lm_type == 'RoBERTa':
             self.hidden_dim = 1024
+        elif self.lm_type == 'LLaMA':
+            self.hidden_dim = 4096
         self.output_dim = self.num_class
         self.lr = float(config['lr'])
         self.weight_decay = float(config['weight_decay'])
@@ -39,6 +41,8 @@ class SimpleCIL(BaseModel):
                 
                 if lm_type == 'RoBERTa':
                     self.lm = RoBERTaNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
+                elif lm_type == 'LLaMA':
+                    self.lm = LLaMANet(max_length, output_dim, model_path, lora_config, dropout, att_dropout).to(device)
 
                 self.fc = nn.Linear(hidden_dim, output_dim).to(device)
 
@@ -46,14 +50,14 @@ class SimpleCIL(BaseModel):
                 tokens = self.lm.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 tokens['input_ids'] = tokens['input_ids'].to(self.device)
                 tokens['attention_mask'] = tokens['attention_mask'].to(self.device)
-                _, hidden_states = self.lm(tokens['input_ids'], tokens['attention_mask'])
-                logits = self.fc(hidden_states[-1][:, 0, :])
+                hidden_embs = self.lm(tokens['input_ids'], tokens['attention_mask'])
+                logits = self.fc(hidden_embs)
 
-                return logits, hidden_states
+                return logits, hidden_embs
 
             def cosine_forward(self, samples):
-                logits, hidden_states = self.forward(samples)
-                x = hidden_states[-1][:, 0, :]
+                logits, hidden_embs = self.forward(samples)
+                x = hidden_embs
                 x = F.linear(F.normalize(x, p=2, dim=-1), F.normalize(self.fc.weight, p=2, dim=-1))
                 logits = self.T * x
 
@@ -68,10 +72,9 @@ class SimpleCIL(BaseModel):
         for _, batch in enumerate(train_loader):
             if batch['node_id'].size(0) < 2:
                 break
-            _, hidden_states = model(batch)
-            embeds = hidden_states[-1][:, 0, :]
+            _, hidden_embeds = model(batch)
             labels = batch['labels'].to(device)
-            embeds_list.extend(embeds)
+            embeds_list.extend(hidden_embeds)
             labels_list.extend(labels)
         
         embeds = torch.stack(embeds_list, dim=0)

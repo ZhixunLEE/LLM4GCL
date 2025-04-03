@@ -12,14 +12,19 @@ from torch_geometric.utils import k_hop_subgraph
 from transformers.models.auto import AutoModel, AutoTokenizer
 
 def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, batch_size, max_length, device):
-    assert model_name in ['RoBERTa']
+    assert model_name in ['RoBERTa', 'LLaMA']
 
     if model_name == 'RoBERTa':
         tokenizer = AutoTokenizer.from_pretrained("roberta-large")
         model = AutoModel.from_pretrained("roberta-large", output_hidden_states=True, return_dict=True, cache_dir=model_path).cuda()
         hidden_layers = 24
-    else:
-        raise ValueError(f'Unsupported model {model_name}!')
+    elif model_name == 'LLaMA':
+        model_name_str = 'Llama-3.1-8B'
+        model_path = os.path.join(model_path, 'models--' + model_name_str.lower())
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model = AutoModel.from_pretrained(model_path, output_hidden_states=True, return_dict=True, load_in_4bit=True).to(device)
+        tokenizer.pad_token = tokenizer.eos_token
+        hidden_layers = 32
     
     def mean_pooling(model_output, attention_mask):
         token_embeddings = model_output
@@ -50,22 +55,22 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
 
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
-    torch.save(layers_hid, f=os.path.join(cache_path, 'layer_attr_' + dataset + '.pt'))
+    torch.save(layers_hid, f=os.path.join(cache_path, model_name + '_layer_attr_' + dataset + '.pt'))
 
 
-def get_hidden_embeds(dataset, cache_path, layer_select, generate_func=None, func_params=None):
+def get_hidden_embeds(model_name, dataset, cache_path, layer_select, generate_func=None, func_params=None):
 
     def try_load():
         if dataset in ['products', 'photo', 'arxiv']:
             xs = []
             for i in [0, 5, 10, 15, 20, 24]:
-                file_path = os.path.join(cache_path, f"{i}_layer_attr_{dataset}.pt")
+                file_path = os.path.join(cache_path, f"{model_name}_{i}_layer_attr_{dataset}.pt")
                 if not os.path.exists(file_path):
                     return None
                 xs.append(torch.load(file_path))
             return xs
         else:
-            file_path = os.path.join(cache_path, f"layer_attr_{dataset}.pt")
+            file_path = os.path.join(cache_path, f"{model_name}_layer_attr_{dataset}.pt")
             if not os.path.exists(file_path):
                 return None
             xs = torch.load(file_path)
@@ -205,6 +210,8 @@ class ENGINE(BaseModel):
         self.lm_type = config['lm']
         if self.lm_type == 'RoBERTa':
             self.lm_hidden_dim = 1024
+        elif self.lm_type == 'LLaMA':
+            self.lm_hidden_dim = 4096
         self.lr = float(config['lr'])
         self.weight_decay = float(config['weight_decay'])
         self.model = ENGINEComponent(self.lm_hidden_dim, self.num_class, config, device)
@@ -287,7 +294,7 @@ class ENGINE(BaseModel):
             'max_length': self.max_length, 
             'device': self.device
         }
-        hidden_embeds = get_hidden_embeds(self.dataset, self.cache_path, self.layer_select, generate_hidden_embeds, func_dict)
+        hidden_embeds = get_hidden_embeds(self.lm_type, self.dataset, self.cache_path, self.layer_select, generate_hidden_embeds, func_dict)
 
         for curr_session in range(self.session_num):
             if curr_session != 0:

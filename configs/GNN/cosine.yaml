@@ -16,7 +16,7 @@ default:
   cosine_T: 1.0
   cosine_sample_num: 100
 search_space:
-  gnn: ['GCN', 'GAT', 'SAGE']
+  gnn: ['GCN', 'SAGE']
   lr: [1e-5, 1e-4, 1e-3]
   hidden_dim: [128, 256]
 

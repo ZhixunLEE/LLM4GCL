@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BareLM
-from LLM4GCL.backbones import RoBERTaNet
+from LLM4GCL.backbones import RoBERTaNet, LLaMANet
 from LLM4GCL.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
@@ -30,6 +30,8 @@ class OLoRA(BareLM):
                 
                 if lm_type == 'RoBERTa':
                     self.lm = RoBERTaNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
+                elif lm_type == 'LLaMA':
+                    self.lm = LLaMANet(max_length, output_dim, model_path, lora_config, dropout, att_dropout).to(device)
 
                 self.fc = nn.Sequential(
                     # nn.Linear(hidden_dim, hidden_dim),
@@ -42,8 +44,8 @@ class OLoRA(BareLM):
                 tokens = self.lm.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 tokens['input_ids'] = tokens['input_ids'].to(self.device)
                 tokens['attention_mask'] = tokens['attention_mask'].to(self.device)
-                _, hidden_states = self.lm(tokens['input_ids'], tokens['attention_mask'])
-                logits = self.fc(hidden_states[-1][:, 0, :])
+                hidden_embs = self.lm(tokens['input_ids'], tokens['attention_mask'])
+                logits = self.fc(hidden_embs)
 
                 return logits
             

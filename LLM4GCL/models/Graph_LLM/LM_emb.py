@@ -10,13 +10,19 @@ from LLM4GCL.utils import _save_checkpoint, _reload_best_model
 from tqdm import tqdm
 from transformers.models.auto import AutoModel, AutoTokenizer
 
-
+@torch.no_grad()
 def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, batch_size, max_length, device):
-    assert model_name in ['RoBERTa']
+    assert model_name in ['RoBERTa', 'LLaMA']
 
     if model_name == 'RoBERTa':
         tokenizer = AutoTokenizer.from_pretrained("roberta-large")
-        model = AutoModel.from_pretrained("roberta-large", output_hidden_states=True, return_dict=True, cache_dir=model_path).cuda()
+        model = AutoModel.from_pretrained("roberta-large", output_hidden_states=True, return_dict=True, cache_dir=model_path).to(device)
+    elif model_name == 'LLaMA':
+        model_name_str = 'Llama-3.1-8B'
+        model_path = os.path.join(model_path, 'models--' + model_name_str.lower())
+        tokenizer = AutoTokenizer.from_pretrained(model_path)
+        model = AutoModel.from_pretrained(model_path, output_hidden_states=True, return_dict=True, load_in_4bit=True).to(device)
+        tokenizer.pad_token = tokenizer.eos_token
     else:
         raise ValueError(f'Unsupported model {model_name}!')
 
@@ -34,7 +40,11 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
             out = model(**model_input)
         batch_size = model_input['input_ids'].shape[0]
         hidden_states = out['hidden_states']
-        hidden_embdes.extend(hidden_states[-1][:, 0, :].detach().cpu())
+        if model_name == 'RoBERTa':
+            hidden_states = hidden_states[-1][:, 0, :].detach().cpu()
+        elif model_name == 'LLaMA':
+            hidden_states = hidden_states[-1][:, -1, :].float().detach().cpu()
+        hidden_embdes.extend(hidden_states)
 
     hidden_embdes = torch.stack(hidden_embdes, dim=0)
 
@@ -78,6 +88,8 @@ class LM_emb(BareGNN):
         self.lm_type = config['lm']
         if self.lm_type == 'RoBERTa':
             self.lm_hidden_dim = 1024
+        elif self.lm_type == 'LLaMA':
+            self.lm_hidden_dim = 4096
         self.lm_max_length = config['max_length']
         self.lm_model_path = model_path
         self.cache_path = config['cache']

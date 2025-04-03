@@ -16,9 +16,7 @@ default:
   gem_strength: 5
   gem_n_mem: 100
 search_space:
-  gnn: ['GCN', 'GAT', 'SAGE']
-  lr: [1e-5, 1e-4, 1e-3, 1e-2]
-  hidden_dim: [64, 128, 256]
-  
-  gem_strength: [0.05, 0.5, 5]
-  gem_n_mem: [10, 100, 1000]
+  gnn: ['GCN', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3]  
+  gem_strength: [0.05, 0.5]
+  gem_n_mem: [10, 100]

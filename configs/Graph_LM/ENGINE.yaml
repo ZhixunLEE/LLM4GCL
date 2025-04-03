@@ -1,5 +1,5 @@
 default:
-  lm: 'RoBERTa'
+  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
   seed: [0, 1, 2, 3, 4]
   cache: '/root/autodl-tmp/hidden_states/'
   lr: 5e-5
@@ -8,8 +8,8 @@ default:
   valid_epoch: 10
   patience: 20
   batch_size: 256
-  cache_batch_size: 10
-  max_length: 512
+  cache_batch_size: 30
+  max_length: 256
 
   gnn: 'GCN'
   layer_num: 1
@@ -22,8 +22,8 @@ default:
   engine_T: 0.1
   engine_r: 32
 search_space:
-  lr: [1e-5, 5e-5, 1e-4]
-  gnn: ['GCN', 'GAT', 'SAGE']
+  lr: [1e-5, 1e-4]
+  gnn: ['GCN', 'SAGE']
   hidden_dim: [64, 128, 256]
-  engine_r: [1, 8, 32]
+  engine_r: [1, 32]
   # engine_layer_select: [0,5,10,15,20,-1]

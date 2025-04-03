@@ -13,13 +13,13 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  lm: 'RoBERTa'
+  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
   cache: '/root/autodl-tmp/hidden_embs/'
   cache_batch_size: 30
   max_length: 512
 search_space:
-  gnn: ['GCN', 'GAT', 'SAGE']
-  lr: [1e-5, 1e-4, 1e-3, 1e-2]
+  gnn: ['GCN', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3]
   hidden_dim: [128, 256]
 best_cora:
   gnn: GAT

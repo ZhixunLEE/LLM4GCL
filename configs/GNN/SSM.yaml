@@ -18,8 +18,7 @@ default:
   ssm_nei_budget: [0, 0]
   ssm_lambda: 1
 search_space:
-  gnn: ['GCN', 'GAT', 'SAGE']
-  lr: [1e-5, 1e-4, 1e-3, 1e-2]
-  hidden_dim: [128, 256]
+  gnn: ['GCN', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3]
 
   ssm_c_node_budget: [10, 50, 100]

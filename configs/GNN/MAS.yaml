@@ -15,8 +15,7 @@ default:
 
   strength: 1
 search_space:
-  gnn: ['GCN', 'GAT', 'SAGE']
-  lr: [1e-5, 1e-4, 1e-3, 1e-2]
-  hidden_dim: [128, 256]
+  gnn: ['GCN', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3]
 
-  mas_strength: [1, 100, 10000, 1000000]
+  mas_strength: [1, 100, 10000]

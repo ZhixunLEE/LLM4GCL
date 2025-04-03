@@ -78,9 +78,9 @@ class ERGNN(BareGNN):
                     self.gnn = SGCNet(input_dim, hidden_dim, hidden_dim, layer_num, dropout).to(device)
 
                 self.fc = nn.Sequential(
-                    nn.Linear(hidden_dim, hidden_dim),
-                    nn.ReLU(),
-                    nn.Dropout(p=0.1), 
+                    # nn.Linear(hidden_dim, hidden_dim),
+                    # nn.ReLU(),
+                    # nn.Dropout(p=0.1), 
                     nn.Linear(hidden_dim, output_dim),
                 ).to(device)
 

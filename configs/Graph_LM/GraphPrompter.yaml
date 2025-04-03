@@ -1,5 +1,5 @@
 default:
-  lm: 'RoBERTa'
+  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
   seed: [0, 1, 2, 3, 4]
   epochs: 20
   valid_epoch: 1
@@ -12,11 +12,10 @@ default:
   att_dropout: 0.1
   patience: 5
   batch_size: 10
-  max_length: 512
+  max_length: 256
 
   LoRA:
     use_lora: True
-    target_modules: ["query", "value"]
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05
@@ -31,5 +30,5 @@ default:
   gp_proj_hidden_dim: 1024
 search_space:
   lr: [1e-4, 1e-3]
-  gp_gnn: ['GCN', 'GAT', 'SAGE']
+  gp_gnn: ['GCN', 'SAGE']
   gp_layer_num: [2, 4]

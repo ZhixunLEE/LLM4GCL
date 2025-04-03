@@ -1,7 +1,7 @@
 default:
-  lm: 'RoBERTa'
+  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
   seed: [0, 1, 2, 3, 4]
-  epochs: 20
+  epochs: 2
   valid_epoch: 1
   warmup_epochs: 1
   lr: 2e-4
@@ -11,16 +11,15 @@ default:
   dropout: 0.1
   att_dropout: 0.1
   patience: 5
-  batch_size: 30
-  max_length: 512
+  batch_size: 10
+  max_length: 256
   LoRA:
     use_lora: True
-    target_modules: ["query", "value"]
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05
 
   simplecil_T: 1.0
-  simplecil_sample_num: 100
+  simplecil_sample_num: 20
 search_space:
-  lr: [1e-4, 2e-4, 5e-4, 1e-3]
+  lr: [1e-4, 2e-4, 5e-4]

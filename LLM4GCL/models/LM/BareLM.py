@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import RoBERTaNet
+from LLM4GCL.backbones import RoBERTaNet, LLaMANet
 from LLM4GCL.utils import adjust_learning_rate
 
 from torch.nn.utils import clip_grad_norm_
@@ -15,6 +15,8 @@ class BareLM(BaseModel):
         self.lm_type = config['lm']
         if self.lm_type == 'RoBERTa':
             self.hidden_dim = 1024
+        elif self.lm_type == 'LLaMA':
+            self.hidden_dim = 4096
         self.output_dim = self.num_class
         self.lr = float(config['lr'])
         self.weight_decay = float(config['weight_decay'])
@@ -33,6 +35,8 @@ class BareLM(BaseModel):
                 
                 if lm_type == 'RoBERTa':
                     self.lm = RoBERTaNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
+                elif lm_type == 'LLaMA':
+                    self.lm = LLaMANet(max_length, output_dim, model_path, lora_config, dropout, att_dropout).to(device)
 
                 self.fc = nn.Sequential(
                     # nn.Linear(hidden_dim, hidden_dim),
@@ -45,9 +49,9 @@ class BareLM(BaseModel):
                 tokens = self.lm.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 tokens['input_ids'] = tokens['input_ids'].to(self.device)
                 tokens['attention_mask'] = tokens['attention_mask'].to(self.device)
-                _, hidden_states = self.lm(tokens['input_ids'], tokens['attention_mask'])
-                logits = self.fc(hidden_states[-1][:, 0, :])
-                # logits, _ = self.lm(tokens['input_ids'], tokens['attention_mask'])
+                hidden_embs = self.lm(tokens['input_ids'], tokens['attention_mask'])
+
+                logits = self.fc(hidden_embs)
 
                 return logits
             

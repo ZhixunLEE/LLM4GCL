@@ -16,9 +16,8 @@ default:
   lwf_lambda: 10
   lwf_T: 0.2
 search_space:
-  gnn: ['GCN', 'GAT', 'SAGE']
-  lr: [1e-5, 1e-4, 1e-3, 1e-2]
-  hidden_dim: [128, 256]
+  gnn: ['GCN', 'SAGE']
+  lr: [1e-5, 1e-4, 1e-3]
 
-  lwf_lambda: [0.1, 1., 10.]
-  lwf_T: [0.2, 2, 20]
+  lwf_lambda: [0.1, 1.]
+  lwf_T: [0.2, 2]
