@@ -60,7 +60,7 @@ class Experiment(object):
                     model_name=self.model_name, 
                     seed=seed, 
                     device=self.device)
-            elif self.model_name in ['BareLM', 'SimpleCIL', 'OLoRA', 'LM_emb', 'GraphPrompter', 'ENGINE']:
+            elif self.model_name in ['BareLM', 'SimpleCIL', 'OLoRA', 'LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 

@@ -73,7 +73,7 @@ class TextDataset(Dataset):
             data.y = labels
 
         edge_index, _ = add_self_loops(data.edge_index)
-
+        
         new_data = Data(
             x=data.x,
             edge_index=edge_index,

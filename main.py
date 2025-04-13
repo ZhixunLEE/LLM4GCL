@@ -8,7 +8,7 @@ from LLM4GCL.utils import load_config, merge_params, update_config, select_hyper
 model_dict = {
     'GNN': ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'CaT', 'DeLoMe', 'TPP'],
     'LM': ['BareLM', 'SimpleCIL', 'OLoRA'], 
-    'Graph_LM': ['LM_emb', 'GraphPrompter', 'ENGINE'], 
+    'GLM': ['LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM'], 
 }
 
 if __name__ == '__main__':
@@ -19,20 +19,20 @@ if __name__ == '__main__':
     parser.add_argument('--dataset', 
                         type=str, 
                         default='cora', 
-                        choices=['cora', 'citeseer', 'wikics', 'photo', 'children', 'products', 'arxiv_23', 'arxiv'], 
+                        choices=['cora', 'citeseer', 'wikics', 'photo', 'products', 'arxiv_23', 'arxiv'], 
                         help='the name of TAG dataset')
     parser.add_argument('--data_path', type=str, default='/root/autodl-tmp/data/', help='the path of TAG dataset')
 
     # Model
     parser.add_argument('--model_type', 
                         type=str, 
-                        default='Graph_LM', 
-                        choices=['GNN', 'LM', 'Graph_LM'], 
+                        default='GLM', 
+                        choices=['GNN', 'LM', 'GLM'], 
                         help='Specify the type of model to use. '
                             ' "GNN": Use only Graph Neural Network (GNN) for training and inference. '
                             ' "LM": Use only Language Model (LM) for training and inference. '
-                            ' "Graph_LM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
-    parser.add_argument('--model', type=str, default='ENGINE', help='the name of model, must match with the model_type')
+                            ' "GLM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
+    parser.add_argument('--model', type=str, default='InstructLM', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
     parser.add_argument('--checkpoint_path', type=str, default='/root/autodl-tmp/checkpoint/', help='the path to store best model weights')
 

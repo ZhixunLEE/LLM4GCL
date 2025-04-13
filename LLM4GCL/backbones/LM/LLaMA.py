@@ -62,4 +62,9 @@ class LLaMANet(torch.nn.Module):
             return_dict=True,
         )
 
-        return outputs.hidden_states[-1][:, -1, :].float()
+        last_hidden_state = outputs.hidden_states[-1].float()  # shape: [batch_size, seq_len, hidden_size]
+
+        input_mask_expanded = attention_mask.unsqueeze(-1).expand(last_hidden_state.size()).float()
+        sum_embeddings = torch.sum(last_hidden_state * input_mask_expanded, 1)
+        sum_mask = torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+        return sum_embeddings / sum_mask
