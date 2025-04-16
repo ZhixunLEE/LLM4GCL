@@ -1,7 +1,7 @@
 from LLM4GCL.models import BareGNN
 
 from tqdm import tqdm
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 class JointGNN(BareGNN):
 

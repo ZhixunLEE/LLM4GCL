@@ -4,11 +4,15 @@ import torch.nn.functional as F
 
 from LLM4GCL.models import BaseModel
 from LLM4GCL.backbones import RoBERTaNet, LLaMANet
-from LLM4GCL.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch.nn.utils import clip_grad_norm_
 
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 class SimpleCIL(BaseModel):
 
@@ -38,11 +42,12 @@ class SimpleCIL(BaseModel):
                 self.device = device
                 self.max_length = max_length
                 self.T = T
+                self.lm_type = lm_type
                 
                 if lm_type == 'RoBERTa':
                     self.lm = RoBERTaNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
                 elif lm_type == 'LLaMA':
-                    self.lm = LLaMANet(max_length, output_dim, model_path, lora_config, dropout, att_dropout).to(device)
+                    self.lm = LLaMANet(model_path, lora_config, dropout, att_dropout).to(device)
 
                 self.fc = nn.Linear(hidden_dim, output_dim).to(device)
 
@@ -50,7 +55,13 @@ class SimpleCIL(BaseModel):
                 tokens = self.lm.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
                 tokens['input_ids'] = tokens['input_ids'].to(self.device)
                 tokens['attention_mask'] = tokens['attention_mask'].to(self.device)
-                hidden_embs = self.lm(tokens['input_ids'], tokens['attention_mask'])
+                outputs = self.lm(tokens['input_ids'], tokens['attention_mask'])
+
+                if self.lm_type in ['RoBERTa']:
+                    hidden_embs = outputs.hidden_states[-1][:, 0, :]
+                elif self.lm_type in ['LLaMA']:
+                    hidden_embs = mean_pooling(outputs.hidden_states[-1], tokens['attention_mask'])
+
                 logits = self.fc(hidden_embs)
 
                 return logits, hidden_embs
@@ -214,8 +225,7 @@ class SimpleCIL(BaseModel):
             class_num, text_dataset_iso, text_dataset_joint, train_loader, _, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session, subset=self.sample_num)
             task_classes = [i for i in range(class_offset, class_num)]
 
-            if curr_session != 0:
-                self.update_proto(self.model, text_dataset_iso.data, train_loader, task_classes, self.config, self.device)
+            self.update_proto(self.model, text_dataset_iso.data, train_loader, task_classes, self.config, self.device)
             curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device)
             curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device)
 

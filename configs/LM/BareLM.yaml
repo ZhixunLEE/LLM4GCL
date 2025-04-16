@@ -1,7 +1,7 @@
 default:
-  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
+  lm: 'RoBERTa' # ['RoBERTa', 'LLaMA']
   seed: [0, 1, 2, 3, 4]
-  epochs: 20
+  epochs: 10
   valid_epoch: 1
   warmup_epochs: 1
   lr: 2e-4
@@ -10,11 +10,11 @@ default:
   weight_decay: 5e-2
   dropout: 0.1
   att_dropout: 0.1
-  patience: 5
-  batch_size: 20
+  patience: 3
+  batch_size: 10
   max_length: 256
   LoRA:
-    use_lora: True
+    use_lora: False
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05

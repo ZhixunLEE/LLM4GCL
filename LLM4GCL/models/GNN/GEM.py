@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BareGNN
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch_geometric.utils import k_hop_subgraph

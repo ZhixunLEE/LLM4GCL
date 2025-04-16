@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, f1_score
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 class BaseModel(nn.Module):
 
@@ -102,11 +102,16 @@ class BaseModel(nn.Module):
 
 
     def get_metric(self, logits, preds, labels):
-        logits = logits.detach().cpu().numpy()
-        preds = preds.cpu().numpy()
-        labels = labels.cpu().numpy()
+        logits = logits.detach().cpu().numpy() if logits is not None else None
+        preds = preds.cpu().numpy() if isinstance(preds, torch.Tensor) else np.array(preds)
+        labels = labels.cpu().numpy() if isinstance(labels, torch.Tensor) else np.array(labels)
+        
+        if isinstance(preds[0], str) or isinstance(labels[0], str):
+            preds = np.array([str(p).strip().lower() for p in preds])
+            labels = np.array([str(l).strip().lower() for l in labels])
+
         acc = accuracy_score(labels, preds)
         f1 = f1_score(labels, preds, average='macro', zero_division=0)
-
+        
         return acc, f1
 

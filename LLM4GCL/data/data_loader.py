@@ -1,3 +1,4 @@
+import json
 import heapq
 import torch
 from torch_geometric.data import Data
@@ -13,11 +14,17 @@ class TextDataset(Dataset):
         self.data, self.id_by_class = self._load_data()
         self.raw_texts = self.data.raw_texts
 
+        label_text_list = None
+        with open('LLM4GCL/common/label_text.json', 'r', encoding='utf-8') as f:
+            label_text_list = json.load(f)[dataset]
+        self.label_texts = label_text_list
+
     def __getitem__(self, idx):
         item = {}
         item['node_id'] = idx
         item["labels"] = self.data.y[idx].to(torch.long)
         item["raw_text"] = self.raw_texts[idx]
+        item["label_text"] = self.label_texts[item["labels"]]
 
         return item
 

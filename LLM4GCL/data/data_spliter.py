@@ -23,7 +23,8 @@ class TaskLoader():
                 self.task_num = (self.data.y.max().item() + 1) // self.session_size
 
         # Task Split
-        train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint = self._split_data()
+        node_idx_per_class, train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint = self._split_data()
+        self.node_idx_per_class = node_idx_per_class
         self.train_idx_per_task = train_idx_per_task
         self.valid_idx_per_task = valid_idx_per_task
         self.test_idx_per_task_isolate = test_idx_per_task_isolate
@@ -90,6 +91,7 @@ class TaskLoader():
         return spliter()
 
     def _normal_cls_cl_spliter(self, ):
+        node_idx_per_class = []
         train_idx_per_task = []
         valid_idx_per_task = []
         test_idx_per_task_isolate = []
@@ -101,12 +103,14 @@ class TaskLoader():
 
         for i in range(self.task_num):
             curr_task_class_idx = all_class[i * self.session_size : (i + 1) * self.session_size]
+            node_idx_curr_class = []
             train_idx_curr_task = []
             valid_idx_curr_task = []
             test_idx_curr_task = []
 
             for cla in curr_task_class_idx:
                 node_idx = self.id_by_class[cla]
+                node_idx_curr_class.extend(node_idx)
                 node_num = len(node_idx)
                 train_num, valid_num, test_num = int(node_num * self.train_ratio), int(node_num * self.valid_ratio), int(node_num * self.test_ratio)
                 random.shuffle(node_idx)
@@ -115,6 +119,7 @@ class TaskLoader():
                 valid_idx_curr_task.extend(node_idx[train_num : train_num + valid_num])
                 test_idx_curr_task.extend(node_idx[train_num + valid_num: train_num + valid_num + test_num])
        
+            node_idx_per_class.append(node_idx_curr_class)
             train_idx_per_task.append(train_idx_curr_task)
             valid_idx_per_task.append(valid_idx_curr_task)
             test_idx_per_task_isolate.append(test_idx_curr_task)
@@ -129,7 +134,7 @@ class TaskLoader():
             prev_dataset = self._adjust_graph(all_class[: (i + 1) * self.session_size])
             dataset_per_task_joint.append(prev_dataset)
 
-        return train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint
+        return node_idx_per_class, train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint
 
     def _adjust_graph(self, class_id):
         node_mask = torch.zeros(len(self.data.y), dtype=torch.bool)

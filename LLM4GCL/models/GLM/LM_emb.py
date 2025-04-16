@@ -5,10 +5,15 @@ import torch.nn as nn
 
 from LLM4GCL.models import BareGNN
 from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from transformers.models.auto import AutoModel, AutoTokenizer
+
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
 
 @torch.no_grad()
 def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, batch_size, max_length, device):
@@ -39,11 +44,11 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
         with torch.no_grad():
             out = model(**model_input)
         batch_size = model_input['input_ids'].shape[0]
-        hidden_states = out['hidden_states']
+
         if model_name == 'RoBERTa':
-            hidden_states = hidden_states[-1][:, 0, :].detach().cpu()
+            hidden_states = out.hidden_states[-1][:, 0, :].detach().cpu()
         elif model_name == 'LLaMA':
-            hidden_states = hidden_states[-1][:, -1, :].float().detach().cpu()
+            hidden_states = mean_pooling(out.hidden_states[-1], model_input['attention_mask'].cpu())
         hidden_embdes.extend(hidden_states)
 
     hidden_embdes = torch.stack(hidden_embdes, dim=0)

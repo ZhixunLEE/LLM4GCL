@@ -1,6 +1,5 @@
 default:
-  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
-  cache: 'instruct_prompts'
+  lm: 'LLaMA'
   seed: [0, 1, 2, 3, 4]
   epochs: 2
   valid_epoch: 1
@@ -11,16 +10,21 @@ default:
   weight_decay: 5e-2
   dropout: 0.1
   att_dropout: 0.1
-  patience: 5
-  batch_size: 10
-  max_length: 256
+  patience: 2
+  batch_size: 5
+  max_length: 512
   LoRA:
     use_lora: True
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05
 
-  simplecil_T: 1.0
-  simplecil_sample_num: 20
+  T: 1.0
+  sample_num: 20
+  hop: [20, 20]
+  mode: 'neighbors' # ['neighbors', 'ego', 'pure']
+  include_label: False
+  max_node_text_len: 128
+  use_simplecil: False
 search_space:
   lr: [1e-4, 2e-4, 5e-4]

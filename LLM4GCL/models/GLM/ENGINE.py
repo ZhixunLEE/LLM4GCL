@@ -5,7 +5,7 @@ import torch.nn as nn
 
 from LLM4GCL.models import BaseModel
 from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch_geometric.utils import k_hop_subgraph
@@ -48,7 +48,10 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
         
         for i, layer_hid in enumerate(hidden_states):
             layer_hid = layer_hid.cpu()
-            layer_node_hid = mean_pooling(layer_hid, model_input['attention_mask'].cpu())
+            if model_name in ['RoBERTa']:
+                layer_node_hid = layer_hid[-1][:, 0:, ]
+            elif model_name in ['LLaMA']:
+                layer_node_hid = mean_pooling(layer_hid, model_input['attention_mask'].cpu())
             layers[i].append(layer_node_hid.cpu())
             
     layers_hid = [torch.cat(xs).float() for xs in layers]

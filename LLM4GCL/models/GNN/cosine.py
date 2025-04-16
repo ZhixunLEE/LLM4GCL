@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
 from LLM4GCL.models import BaseModel
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch_geometric.utils import k_hop_subgraph

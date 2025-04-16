@@ -17,7 +17,6 @@ from .GNN.TPP import TPP
 
 from .LM.BareLM import BareLM
 from .LM.SimpleCIL import SimpleCIL
-from .LM.OLoRA import OLoRA
 
 from .GLM.LM_emb import LM_emb
 from .GLM.GraphPrompter import GraphPrompter

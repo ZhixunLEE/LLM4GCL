@@ -4,7 +4,7 @@ import torch.nn as nn
 
 from LLM4GCL.models import BareGNN
 from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch_geometric.utils import k_hop_subgraph
@@ -126,7 +126,6 @@ class ERGNN(BareGNN):
         sampled_ids = self.sampler(ids_per_cls_new, self.budget, feats, embeds, self.d_CM, using_half=False)
         sampled_ids_new = [node_idx_list[idx] for idx in sampled_ids]
         self.buffer_node_ids.extend(sampled_ids_new)
-
         subset, edge_index, mapping, _ = k_hop_subgraph(self.buffer_node_ids, config['layer_num'], data.edge_index, relabel_nodes=True)
         self.aux_feats, self.aux_edge_index, self.aux_labels, self.aux_mapping = data.x[subset].to(device), edge_index.to(device), data.y[subset][mapping].to(device), mapping.to(device)
 
@@ -244,7 +243,7 @@ class ERGNN(BareGNN):
             progress_bar.close()
 
             _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-            self.update_memory(curr_session, self.model, text_dataset_iso, train_loader, self.config, self.device)
+            self.update_memory(curr_session, self.model, text_dataset_joint, train_loader, self.config, self.device)
             curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device)
             curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device)
 

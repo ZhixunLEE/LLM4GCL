@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 from LLM4GCL.models import BareGNN
 from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet, SGConv
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch import Tensor
@@ -27,7 +27,7 @@ def add_edges(graph):
     connected_nodes = torch.where(deg != 1)[0].cpu().numpy()
 
     if len(isolated_nodes) == 0 or len(connected_nodes) == 0:
-        return edge_index
+        return graph
 
     random_nodes = np.random.choice(connected_nodes, size=len(isolated_nodes), replace=True)
 
@@ -39,7 +39,6 @@ def add_edges(graph):
     graph.edge_index = edge_index
 
     return graph
-
 
 
 def drop_feature(x, drop_prob):

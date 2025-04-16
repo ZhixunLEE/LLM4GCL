@@ -3,9 +3,9 @@ import numpy as np
 
 from LLM4GCL.models import *
 import LLM4GCL.models as models
-from LLM4GCL.metric import CLMetric
+from LLM4GCL.common.metric import CLMetric
 from LLM4GCL.data import TextDataset, TaskLoader
-from LLM4GCL.utils import seed_everything
+from LLM4GCL.common.utils import seed_everything
 
 
 class Experiment(object):

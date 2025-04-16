@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BareGNN
-from LLM4GCL.utils import _save_checkpoint, _reload_best_model
+from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
 from torch_geometric.nn import GCNConv
@@ -227,8 +227,8 @@ class CaT(BareGNN):
         optimizer = self.get_optimizer(self.model)
 
         for curr_session in range(self.session_num):
-            _, text_dataset_iso, _, train_loader, _, _, _ = self.task_loader.get_task(curr_session)
-            replayed_graph = self.memorize(curr_session, train_loader, text_dataset_iso.data)
+            _, _, text_dataset_joint, train_loader, _, _, _ = self.task_loader.get_task(curr_session)
+            replayed_graph = self.memorize(curr_session, train_loader, text_dataset_joint.data)
             self.memory_bank.append(replayed_graph)
 
 

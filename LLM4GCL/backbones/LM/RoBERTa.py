@@ -54,5 +54,5 @@ class RoBERTaNet(torch.nn.Module):
             return_dict=True,
         )
         
-        return outputs.hidden_states[-1][:, 0,: ]
+        return outputs
 
