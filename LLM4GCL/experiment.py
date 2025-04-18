@@ -16,7 +16,7 @@ class Experiment(object):
         self.model_type = args.model_type
         self.model_name = args.model
         self.model_path = args.model_path
-        self.checkpoint_path = args.checkpoint_path
+        self.ckpt_path = args.ckpt_path
         
         self.cl_type = args.cl_type
         self.task_type = args.task_type
@@ -55,7 +55,7 @@ class Experiment(object):
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
                     config=self.config, 
-                    checkpoint_path=self.checkpoint_path, 
+                    checkpoint_path=self.ckpt_path, 
                     dataset=self.dataset, 
                     model_name=self.model_name, 
                     seed=seed, 
@@ -65,7 +65,7 @@ class Experiment(object):
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
                     config=self.config, 
-                    checkpoint_path=self.checkpoint_path, 
+                    checkpoint_path=self.ckpt_path, 
                     dataset=self.dataset, 
                     model_name=self.model_name, 
                     model_path=self.model_path,
