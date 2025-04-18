@@ -1,3 +1,5 @@
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 import yaml
 import argparse
 
@@ -6,7 +8,7 @@ from LLM4GCL.common.utils import load_config, merge_params, update_config, selec
 
 
 model_dict = {
-    'GNN': ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'CaT', 'DeLoMe', 'TPP'],
+    'GNN': ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'TPP'],
     'LM': ['BareLM', 'SimpleCIL'], 
     'GLM': ['LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM'], 
 }
@@ -26,7 +28,7 @@ if __name__ == '__main__':
     # Model
     parser.add_argument('--model_type', 
                         type=str, 
-                        default='LM', 
+                        default='GNN', 
                         choices=['GNN', 'LM', 'GLM'], 
                         help='Specify the type of model to use. '
                             ' "GNN": Use only Graph Neural Network (GNN) for training and inference. '
@@ -34,7 +36,7 @@ if __name__ == '__main__':
                             ' "GLM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
     parser.add_argument('--model', type=str, default='SimpleCIL', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
-    parser.add_argument('--checkpoint_path', type=str, default='/root/autodl-tmp/checkpoint/', help='the path to store best model weights')
+    parser.add_argument('--ckpt_path', type=str, default='/root/autodl-tmp/ckpt/', help='the path to store best model weights')
 
     # Settings
     parser.add_argument('--cl_type', type=str, default='class', choices=['class'], help='The type of CL. E.g., class is for class incremental learning')

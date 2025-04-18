@@ -50,7 +50,7 @@ class Experiment(object):
             # Model Initialization
             result_logger = CLMetric()
             
-            if self.model_name in ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'CaT', 'DeLoMe', 'TPP']:
+            if self.model_name in ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'TPP']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 

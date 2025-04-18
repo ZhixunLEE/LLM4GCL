@@ -5,6 +5,7 @@ from torch_geometric.data import Data
 from torch_geometric.utils import add_self_loops
 
 from torch.utils.data import Dataset
+from huggingface_hub import hf_hub_download
 
 class TextDataset(Dataset):
     def __init__(self, dataset, data_path):
@@ -33,6 +34,12 @@ class TextDataset(Dataset):
     
     def _load_data(self, ):
         path = self.data_path + self.dataset + ".pt"
+        hf_hub_download(
+            repo_id="YYYumo/LLM4GCL",
+            filename=self.dataset + ".pt",
+            repo_type="dataset",
+            local_dir=self.data_path
+        )
         data = torch.load(path)
 
         if self.dataset == 'products' or self.dataset == 'arxiv_23':
