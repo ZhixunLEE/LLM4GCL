@@ -9,10 +9,10 @@ from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 from tqdm import tqdm
 from torch_geometric.utils import k_hop_subgraph
 
-class cosine(BaseModel):
+class TEEN(BaseModel):
 
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device):
-        super(cosine, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
+        super(TEEN, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
         self.gnn_type = config['gnn']
         self.input_dim = self.feat_dim
         self.hidden_dim = config['hidden_dim']
@@ -21,8 +21,11 @@ class cosine(BaseModel):
         self.dropout = config['dropout']
         self.num_heads = config['num_heads']
         self.aggr = config['aggr']
-        self.T = config['cosine_T']
-        self.sample_num = config['cosine_sample_num']
+
+        self.TEEN_T = config['TEEN_T']
+        self.TEEN_sample_num = config['TEEN_sample_num']
+        self.TEEN_softmax_t = config['TEEN_softmax_t']
+        self.TEEN_shift_weight = config['TEEN_shift_weight']
 
         class GNNModel(nn.Module):
 
@@ -53,8 +56,9 @@ class cosine(BaseModel):
 
                 return x
 
-        self.model = GNNModel(self.gnn_type, self.input_dim, self.hidden_dim, self.output_dim, self.layer_num, self.dropout, self.num_heads, self.aggr, self.T, self.device)
+        self.model = GNNModel(self.gnn_type, self.input_dim, self.hidden_dim, self.output_dim, self.layer_num, self.dropout, self.num_heads, self.aggr, self.TEEN_T, self.device)
 
+    @torch.no_grad()
     def update_proto(self, model, data, train_loader, class_src, class_dst, config, device):
         model.eval()
         embeds_list, labels_list = [], []
@@ -75,6 +79,24 @@ class cosine(BaseModel):
             class_embed = embeds[data_index]
             proto = class_embed.mean(0)
             model.fc.weight.data[class_index] = proto
+
+    @torch.no_grad()
+    def soft_calibration(self, model, base_class, class_src, class_dst):
+        base_protos = model.fc.weight.data[:base_class].detach().cpu().data
+        base_protos = F.normalize(base_protos, p=2, dim=-1)
+
+        cur_protos = self.model.fc.weight.data[class_src: class_dst].detach().cpu().data
+        cur_protos = F.normalize(cur_protos, p=2, dim=-1)
+        
+        weights = torch.mm(cur_protos, base_protos.T) * self.TEEN_softmax_t
+        norm_weights = torch.softmax(weights, dim=1)
+        delta_protos = torch.matmul(norm_weights, base_protos)
+
+        delta_protos = F.normalize(delta_protos, p=2, dim=-1)
+        
+        updated_protos = (1 - self.TEEN_shift_weight) * cur_protos + self.TEEN_shift_weight * delta_protos
+
+        model.fc.weight.data[class_src : class_dst] = updated_protos
 
     def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_src, class_dst, config, device):
         model.train()
@@ -199,10 +221,11 @@ class cosine(BaseModel):
 
         _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
         for curr_session in range(self.session_num):
-            class_src, class_dst, text_dataset_iso, text_dataset_joint, train_loader, _, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session, subset=self.sample_num)
+            class_src, class_dst, text_dataset_iso, text_dataset_joint, train_loader, _, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session, subset=self.TEEN_sample_num)
 
             if curr_session != 0:
                 self.update_proto(self.model, text_dataset_iso.data, train_loader, class_src, class_dst, self.config, self.device)
+                self.soft_calibration(self.model, self.task_loader.base_session, class_src, class_dst)
             curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device)
             curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_dst, self.config, self.device)
 

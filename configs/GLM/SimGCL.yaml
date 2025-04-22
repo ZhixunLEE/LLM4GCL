@@ -25,6 +25,6 @@ default:
   mode: 'neighbors' # ['neighbors', 'ego', 'pure']
   include_label: False
   max_node_text_len: 128
-  use_simplecil: False
+
 search_space:
   lr: [1e-4, 2e-4, 5e-4]

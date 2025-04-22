@@ -14,6 +14,11 @@ from torch.nn.utils import clip_grad_norm_
 
 IGNORE_INDEX = -100
 
+def mean_pooling(model_output, attention_mask):
+    token_embeddings = model_output
+    input_mask_expanded = attention_mask.unsqueeze(-1).expand(token_embeddings.size()).float()
+    return torch.sum(token_embeddings * input_mask_expanded, 1) / torch.clamp(input_mask_expanded.sum(1), min=1e-9)
+
 class InstructLM(BaseModel):
 
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, local_ce, seed, device):
@@ -37,9 +42,12 @@ class InstructLM(BaseModel):
                 super(LMModel, self).__init__()
                 self.device = device
                 self.max_length = max_length
+                self.T = 1.0
                 
                 if lm_type == 'LLaMA':
                     self.lm = LLaMANet(model_path, lora_config, dropout, att_dropout).to(device)
+
+                self.fc = nn.Linear(hidden_dim, output_dim).to(device)
 
             def forward(self, instructions):
                 tokenizer = self.lm.tokenizer
@@ -120,6 +128,49 @@ class InstructLM(BaseModel):
                 
                 return outputs
 
+            def embedding_forward(self, instructions):
+                tokenizer = self.lm.tokenizer
+                embedding = self.lm.embeddings
+                bos_id = tokenizer.bos_token_id
+                
+                batch_inputs_embeds = []
+                batch_attention_mask = []
+                
+                for item in instructions:
+                    context, question = '[INST]' + item["Context"], item["Question"] + '[/INST]'
+                    context_tokens = tokenizer(context, add_special_tokens=False).to(self.device)
+                    question_tokens = tokenizer(question, add_special_tokens=False).to(self.device)
+
+                    # <s> [INST] Context + Question [/INST]
+                    max_text_len = self.max_length - len(question_tokens.input_ids) - 1
+                    input_ids = [bos_id] + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids
+                    inputs_embeds = embedding(torch.tensor(input_ids).to(self.device))
+                    
+                    batch_inputs_embeds.append(inputs_embeds)
+                    batch_attention_mask.append([1] * len(input_ids))
+                
+                max_length = max([x.shape[0] for x in batch_inputs_embeds])
+                pad_embeds = embedding(torch.tensor(tokenizer.pad_token_id)).unsqueeze(0)
+                for i in range(len(batch_inputs_embeds)):
+                    pad_length = max_length - batch_inputs_embeds[i].shape[0]
+                    batch_inputs_embeds[i] = torch.cat([pad_embeds.repeat(pad_length, 1), batch_inputs_embeds[i]])
+                    batch_attention_mask[i] = [0] * pad_length + batch_attention_mask[i]
+                
+                inputs_embeds = torch.stack(batch_inputs_embeds, dim=0).to(self.device)
+                attention_mask = torch.tensor(batch_attention_mask).to(self.device)
+                
+                outputs = self.lm(inputs_embeds, attention_mask)
+                
+                return outputs, attention_mask
+
+            def cosine_forward(self, instructions):
+                outputs, attention_mask = self.embedding_forward(instructions)
+                x = mean_pooling(outputs.hidden_states[-1], attention_mask)
+                x = F.linear(F.normalize(x, p=2, dim=-1), F.normalize(self.fc.weight, p=2, dim=-1))
+                logits = self.T * x
+
+                return logits
+
         self.model = LMModel(self.lm_type, self.max_length, self.model_path, self.hidden_dim, self.output_dim, self.lora_config, self.dropout, self.att_dropout, self.device)
     
     def get_optimizer(self, model):
@@ -130,6 +181,30 @@ class InstructLM(BaseModel):
         )
 
         return optimizer
+
+    @torch.no_grad()
+    def update_proto(self, model, text_dataset, train_loader, class_src, class_dst, device):
+        self.model.eval()
+        embeds_list, labels_list = [], []
+        for _, batch in enumerate(train_loader):
+            if batch['node_id'].size(0) < 2:
+                break
+            instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, None, class_dst, self.dataset, mode='ego')
+            outputs, attention_mask = model.embedding_forward(instructions)
+            hidden_embeds = mean_pooling(outputs.hidden_states[-1], attention_mask)
+
+            labels = batch['labels'].to(device)
+            embeds_list.extend(hidden_embeds)
+            labels_list.extend(labels)
+        
+        embeds = torch.stack(embeds_list, dim=0)
+        labels = torch.stack(labels_list, dim=0)
+
+        for class_index in range(class_src, class_dst):
+            data_index = (labels == class_index).nonzero().squeeze(-1)
+            class_embed = embeds[data_index]
+            proto = class_embed.mean(0)
+            self.model.fc.weight.data[class_index] = proto
 
     def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device):
         model.train()
@@ -177,12 +252,36 @@ class InstructLM(BaseModel):
         acc, f1 = self.get_metric(None, preds, labels)
 
         return acc, f1
+    
+    @torch.no_grad()
+    def cosine_evaluate(self, model, text_dataset, test_loader, class_num, config, device):
+        model.eval()
+        logits_list, preds_list, labels_list = [], [], []
+        for _, batch in enumerate(test_loader):
+            if batch['node_id'].size(0) < 2:
+                break
+            instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, None, class_num, self.dataset, mode='ego')
+            logits = model.cosine_forward(instructions)
+            logits = logits[:, : class_num]
+            preds = torch.argmax(logits, dim=1)
+            labels = batch['labels']
 
+            logits_list.extend(logits)
+            preds_list.extend(preds)
+            labels_list.extend(labels)
+
+        logits = torch.stack(logits_list, dim=0)
+        preds = torch.stack(preds_list, dim=0)
+        labels = torch.stack(labels_list, dim=0)
+
+        acc, f1 = self.get_metric(logits, preds, labels)
+
+        return acc, f1
     
     def fit(self, iter):
         optimizer = self.get_optimizer(self.model)
         for curr_session in range(self.session_num):
-            _, class_dst, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
+            class_src, class_dst, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
 
             if curr_session == 0:
                 progress_bar = tqdm(range(self.config['epochs']))
@@ -215,13 +314,14 @@ class InstructLM(BaseModel):
                 progress_bar.close()
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
 
-            curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device)
-            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_dst, self.config, self.device)
+            self.update_proto(self.model, text_dataset_iso, train_loader, class_src, class_dst, self.device)
+            curr_acc_test_isolate, curr_f1_test_isolate = self.cosine_evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device)
+            curr_acc_test_joint, curr_f1_test_joint = self.cosine_evaluate(self.model, text_dataset_joint, test_loader_joint, class_dst, self.config, self.device)
 
             acc_list = []
             for s in range(curr_session):
                 _, _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
-                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device)
+                prev_acc_test_isolate, prev_f1_test_isolate = self.cosine_evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device)
                 acc_list.append(prev_acc_test_isolate)
             acc_list.append(curr_acc_test_isolate)
 

@@ -23,12 +23,10 @@ def mean_pooling(model_output, attention_mask):
 
 class SimGCL(BaseModel):
 
-    def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, seed, device):
-        super(SimGCL, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+    def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, local_ce, seed, device):
+        super(SimGCL, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
 
         self.lm_type = config['lm']
-        if self.lm_type not in ['LLaMA']:
-            raise ValueError('SimGCL only supports decoder-only backbones!')
         if self.lm_type == 'LLaMA':
             self.hidden_dim = 4096
         self.output_dim = self.num_class
@@ -46,7 +44,6 @@ class SimGCL(BaseModel):
         self.mode = config['mode']
         self.include_label = config['include_label']
         self.max_node_text_len = config['max_node_text_len']
-        self.use_simplecil = config['use_simplecil']
 
         class LMModel(nn.Module):
             def __init__(self, lm_type, max_length, model_path, hidden_dim, output_dim, lora_config, dropout, att_dropout, T, device):
@@ -185,13 +182,13 @@ class SimGCL(BaseModel):
         self.model = LMModel(self.lm_type, self.max_length, self.model_path, self.hidden_dim, self.output_dim, self.lora_config, self.dropout, self.att_dropout, self.T, self.device)
 
     @torch.no_grad()
-    def update_proto(self, model, text_dataset, train_loader, task_classes, class_num, device, label_index):
+    def update_proto(self, model, text_dataset, train_loader, class_src, class_dst, device, label_index):
         self.model.eval()
         embeds_list, labels_list = [], []
         for _, batch in enumerate(train_loader):
             if batch['node_id'].size(0) < 2:
                 break
-            instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, label_index, class_num, self.dataset, self.hop, self.mode, self.include_label, self.max_node_text_len)
+            instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, label_index, class_dst, self.dataset, self.hop, self.mode, self.include_label, self.max_node_text_len)
             outputs, attention_mask = model.embedding_forward(instructions)
             hidden_embeds = mean_pooling(outputs.hidden_states[-1], attention_mask)
 
@@ -202,7 +199,7 @@ class SimGCL(BaseModel):
         embeds = torch.stack(embeds_list, dim=0)
         labels = torch.stack(labels_list, dim=0)
 
-        for class_index in task_classes:
+        for class_index in range(class_src, class_dst):
             data_index = (labels == class_index).nonzero().squeeze(-1)
             class_embed = embeds[data_index]
             proto = class_embed.mean(0)
@@ -240,17 +237,17 @@ class SimGCL(BaseModel):
         return all_loss / train_num
 
     @torch.no_grad()
-    def valid(self, model, text_dataset, valid_loader, class_num, config, device, label_index=None):
-        return self.evaluate(model, text_dataset, valid_loader, class_num, config, device, label_index)
+    def valid(self, model, text_dataset, valid_loader, class_dst, config, device, label_index=None):
+        return self.evaluate(model, text_dataset, valid_loader, class_dst, config, device, label_index)
 
     @torch.no_grad()
-    def evaluate(self, model, text_dataset, test_loader, class_num, config, device, label_index=None):
+    def evaluate(self, model, text_dataset, test_loader, class_dst, config, device, label_index=None):
         model.eval()
         preds_list, labels_list = [], []
         for _, batch in enumerate(test_loader):
             if batch['node_id'].size(0) < 2:
                 break
-            instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, label_index, class_num, self.dataset, self.hop, self.mode, self.include_label, self.max_node_text_len)
+            instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, label_index, class_dst, self.dataset, self.hop, self.mode, self.include_label, self.max_node_text_len)
             preds = model.generate(instructions)
             labels = batch['label_text']
 
@@ -301,117 +298,57 @@ class SimGCL(BaseModel):
             else:
                 label_index_joint.append(label_index)
 
-        if self.use_simplecil:
-            class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, _, _ = self.task_loader.get_task(0)
-            train_idx, valid_idx = self.task_loader.train_idx_per_task[0], self.task_loader.valid_idx_per_task[0]
-            label_index = train_idx + valid_idx
+        _, class_dst, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, _, _ = self.task_loader.get_task(0)
+        train_idx, valid_idx = self.task_loader.train_idx_per_task[0], self.task_loader.valid_idx_per_task[0]
+        label_index = train_idx + valid_idx
 
-            progress_bar = tqdm(range(self.config['epochs']))
-            progress_bar.set_description(f'Training | Iter {iter}')
+        progress_bar = tqdm(range(self.config['epochs']))
+        progress_bar.set_description(f'Training | Iter {iter}')
 
-            tolerate, best_acc_valid = 0, 0.
-            for epoch in range(self.config['epochs']):
-                loss = self.train(0, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device, label_index_isolate[0])
-                progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(0, epoch, loss))
+        tolerate, best_acc_valid = 0, 0.
+        for epoch in range(self.config['epochs']):
+            loss = self.train(0, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_dst, self.config, self.device, label_index_isolate[0])
+            progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(0, epoch, loss))
 
-                if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
-                    acc_valid, f1_valid = self.valid(self.model, text_dataset_joint, valid_loader, class_num, self.config, self.device, label_index_isolate[0])
-                    progress_bar.write("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(0, epoch, acc_valid, f1_valid, tolerate))
-                    if acc_valid > best_acc_valid:
-                        tolerate = 0
-                        best_acc_valid = acc_valid
-                        _save_checkpoint(self.model, optimizer, epoch, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-                    else:
-                        tolerate += 1
-                        if tolerate > self.config['patience']: 
-                            break
+            if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
+                acc_valid, f1_valid = self.valid(self.model, text_dataset_joint, valid_loader, class_dst, self.config, self.device, label_index_isolate[0])
+                progress_bar.write("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(0, epoch, acc_valid, f1_valid, tolerate))
+                if acc_valid > best_acc_valid:
+                    tolerate = 0
+                    best_acc_valid = acc_valid
+                    _save_checkpoint(self.model, optimizer, epoch, self.checkpoint_path, self.dataset, self.model_name, self.seed)
+                else:
+                    tolerate += 1
+                    if tolerate > self.config['patience']: 
+                        break
 
-                progress_bar.set_postfix({
-                    'Loss': f"{loss:.4f}",
-                    'Best Valid ACC': f"{best_acc_valid:.4f}",
-                    'Tolerate': tolerate
-                })
+            progress_bar.set_postfix({
+                'Loss': f"{loss:.4f}",
+                'Best Valid ACC': f"{best_acc_valid:.4f}",
+                'Tolerate': tolerate
+            })
 
-                progress_bar.update(1)
-            progress_bar.close()
+            progress_bar.update(1)
+        progress_bar.close()
 
-            _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-            class_offset = 0
-            for curr_session in range(self.session_num):
-                class_num, text_dataset_iso, text_dataset_joint, train_loader, _, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session, subset=self.sample_num)
-                task_classes = [i for i in range(class_offset, class_num)]
+        _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
+        for curr_session in range(self.session_num):
+            class_src, class_dst, text_dataset_iso, text_dataset_joint, train_loader, _, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session, subset=self.sample_num)
 
-                self.update_proto(self.model, text_dataset_iso, train_loader, task_classes, class_num, self.device, label_index_isolate[curr_session])
-                curr_acc_test_isolate, curr_f1_test_isolate = self.cosine_evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device, label_index_isolate[curr_session])
-                curr_acc_test_joint, curr_f1_test_joint = self.cosine_evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device, label_index_joint[curr_session])
+            self.update_proto(self.model, text_dataset_iso, train_loader, class_src, class_dst, self.device, label_index_isolate[curr_session])
+            curr_acc_test_isolate, curr_f1_test_isolate = self.cosine_evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device, label_index_isolate[curr_session])
+            curr_acc_test_joint, curr_f1_test_joint = self.cosine_evaluate(self.model, text_dataset_joint, test_loader_joint, class_dst, self.config, self.device, label_index_joint[curr_session])
 
-                acc_list = []
-                for s in range(curr_session):
-                    _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
-                    prev_acc_test_isolate, prev_f1_test_isolate = self.cosine_evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device, label_index_isolate[curr_session])
-                    acc_list.append(prev_acc_test_isolate)
-                acc_list.append(curr_acc_test_isolate)
+            acc_list = []
+            for s in range(curr_session):
+                _, _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
+                prev_acc_test_isolate, prev_f1_test_isolate = self.cosine_evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device, label_index_isolate[curr_session])
+                acc_list.append(prev_acc_test_isolate)
+            acc_list.append(curr_acc_test_isolate)
 
-                print("Session: {} | Iso. Acc Test: {:.4f} | Iso. F1 Test: {:.4f}".format(curr_session, curr_acc_test_isolate, curr_f1_test_isolate))
-                print("Session: {} | Jot. Acc Test: {:.4f} | Jot. F1 Test: {:.4f}".format(curr_session, curr_acc_test_joint, curr_f1_test_joint))
+            print("Session: {} | Iso. Acc Test: {:.4f} | Iso. F1 Test: {:.4f}".format(curr_session, curr_acc_test_isolate, curr_f1_test_isolate))
+            print("Session: {} | Jot. Acc Test: {:.4f} | Jot. F1 Test: {:.4f}".format(curr_session, curr_acc_test_joint, curr_f1_test_joint))
 
-                self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
-                class_offset = class_num
+            self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
 
-            return self.result_logger
-        
-        
-        else:
-
-            for curr_session in range(self.session_num):
-                if curr_session != 0:
-                    _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-
-                class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
-                
-                progress_bar = tqdm(range(self.config['epochs']))
-                progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
-
-                tolerate, best_acc_valid = 0, 0.
-                for epoch in range(self.config['epochs']):
-                    loss = self.train(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device, label_index_isolate[curr_session])
-                    progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
-
-                    if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
-                        acc_valid, f1_valid = self.valid(self.model, text_dataset_iso, valid_loader, class_num, self.config, self.device, label_index_isolate[curr_session])
-                        progress_bar.write("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(curr_session, epoch, acc_valid, f1_valid, tolerate))
-                        if acc_valid > best_acc_valid:
-                            tolerate = 0
-                            best_acc_valid = acc_valid
-                            _save_checkpoint(self.model, optimizer, epoch, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-                        else:
-                            tolerate += 1
-                            if tolerate > self.config['patience']: 
-                                break
-
-                    progress_bar.set_postfix({
-                        'Loss': f"{loss:.4f}",
-                        'Best Valid ACC': f"{best_acc_valid:.4f}",
-                        'Tolerate': tolerate
-                    })
-
-                    progress_bar.update(1)
-                progress_bar.close()
-
-                _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-                curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device, label_index_isolate[curr_session])
-                curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device, label_index_joint[curr_session])
-
-                acc_list = []
-                for s in range(curr_session):
-                    _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
-                    prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device, label_index_isolate[curr_session])
-                    acc_list.append(prev_acc_test_isolate)
-                acc_list.append(curr_acc_test_isolate)
-
-                print("Session: {} | Iso. Acc Test: {:.4f} | Iso. F1 Test: {:.4f}".format(curr_session, curr_acc_test_isolate, curr_f1_test_isolate))
-                print("Session: {} | Jot. Acc Test: {:.4f} | Jot. F1 Test: {:.4f}".format(curr_session, curr_acc_test_joint, curr_f1_test_joint))
-
-                self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
-
-            return self.result_logger
+        return self.result_logger

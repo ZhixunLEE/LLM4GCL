@@ -70,7 +70,7 @@ class SimpleCIL(BaseModel):
 
     @torch.no_grad()
     def update_proto(self, model, data, train_loader, class_src, class_dst, config, device):
-        self.model.eval()
+        model.eval()
         embeds_list, labels_list = [], []
         for _, batch in enumerate(train_loader):
             if batch['node_id'].size(0) < 2:
@@ -87,7 +87,7 @@ class SimpleCIL(BaseModel):
             data_index = (labels == class_index).nonzero().squeeze(-1)
             class_embed = embeds[data_index]
             proto = class_embed.mean(0)
-            self.model.fc.weight.data[class_index] = proto
+            model.fc.weight.data[class_index] = proto
     
     def get_optimizer(self, model):
         params = [p for _, p in model.named_parameters() if p.requires_grad]

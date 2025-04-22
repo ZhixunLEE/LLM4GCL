@@ -8,7 +8,7 @@ from LLM4GCL.common.utils import load_config, merge_params, update_config, selec
 
 
 model_dict = {
-    'GNN': ['BareGNN', 'EWC', 'LwF', 'cosine', 'Geometer', 'TEEN', 'TAP'],
+    'GNN': ['BareGNN', 'EWC', 'LwF', 'cosine', 'TEEN'],
     'LM': ['RoBERTa', 'LLaMA', 'SimpleCIL', 'InstructLM'], 
     'GLM': ['LM_emb', 'GraphPrompter', 'ENGINE', 'SimGCL'], 
 }
@@ -49,13 +49,13 @@ if __name__ == '__main__':
     # Model
     parser.add_argument('--model_type', 
                         type=str, 
-                        default='GNN', 
+                        default='GLM', 
                         choices=['GNN', 'LM', 'GLM'], 
                         help='Specify the type of model to use. '
                             ' "GNN": Use only Graph Neural Network (GNN) for training and inference. '
                             ' "LM": Use only Language Model (LM) for training and inference. '
                             ' "GLM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
-    parser.add_argument('--model', type=str, default='LwF', help='the name of model, must match with the model_type')
+    parser.add_argument('--model', type=str, default='GraphPrompter', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
     parser.add_argument('--ckpt_path', type=str, default='/root/autodl-tmp/ckpt/', help='the path to store best model weights')
 

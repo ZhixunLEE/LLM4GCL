@@ -144,6 +144,7 @@ class LLaMA(BaseModel):
                 adjust_learning_rate(optimizer.param_groups[0], step / len(train_loader) + curr_epoch, config)
             optimizer.step()
 
+        print(train_num)
         return all_loss / train_num
 
     @torch.no_grad()

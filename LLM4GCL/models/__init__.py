@@ -6,6 +6,7 @@ from .GNN.BareGNN import BareGNN
 from .GNN.EWC import EWC
 from .GNN.LwF import LwF
 from .GNN.cosine import cosine
+from .GNN.TEEN import TEEN
 
 from .LM.RoBERTa import RoBERTa
 from .LM.LLaMA import LLaMA

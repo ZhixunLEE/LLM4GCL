@@ -227,8 +227,8 @@ class GraphPrompterComponent(nn.Module):
 
 class GraphPrompter(BaseModel):
         
-    def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, seed, device):
-        super(GraphPrompter, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+    def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, local_ce, seed, device):
+        super(GraphPrompter, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
 
         self.lm_type = config['lm']
         self.lr = float(config['lr'])
@@ -244,7 +244,7 @@ class GraphPrompter(BaseModel):
 
         return optimizer
 
-    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device, prompts=None):
+    def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_src, class_dst, config, device, prompts=None):
         model.train()
         all_loss, train_num = 0., 0
         for step, batch in enumerate(train_loader):
@@ -254,13 +254,13 @@ class GraphPrompter(BaseModel):
 
             if self.lm_type in ['RoBERTa']:
                 logits = model(batch, text_dataset.data)
-                labels = batch['labels'].to(self.device)
-
-                n_per_cls = [(labels == j).sum() for j in range(self.num_class)]
-                loss_w = [1. / max(i, 1) for i in n_per_cls]
-                loss_w = torch.tensor(loss_w[:class_num]).to(self.device)
-
-                loss = self.loss_func(logits[:, : class_num], labels, loss_w)
+                if self.local_ce:
+                    logits = logits[:, class_src : class_dst]
+                    labels = batch['labels'].to(device) - class_src
+                else:
+                    logits = logits[:, : class_dst]
+                    labels = batch['labels'].to(device)
+                loss = self.loss_func(logits, labels)
             elif self.lm_type in ['LLaMA']:
                 outputs = model(batch, text_dataset.data, prompts)
                 loss = outputs.loss
@@ -277,11 +277,48 @@ class GraphPrompter(BaseModel):
         return all_loss / train_num
 
     @torch.no_grad()
-    def valid(self, model, text_dataset, valid_loader, class_num, config, device, prompts=None):
-        return self.evaluate(model, text_dataset, valid_loader, class_num, config, device, prompts)
+    def valid(self, model, text_dataset, valid_loader, class_src, class_dst, config, device, prompts=None):
+        model.eval()
+        logits_list, preds_list, labels_list = [], [], []
+        for _, batch in enumerate(valid_loader):
+            if batch['node_id'].size(0) < 2:
+                break
+
+            if self.lm_type in ['RoBERTa']:
+                logits = model(batch, text_dataset.data)
+                if self.local_ce:
+                    logits = logits[:, class_src : class_dst]
+                    labels = batch['labels'].to(device) - class_src
+                else:
+                    logits = logits[:, : class_dst]
+                    labels = batch['labels'].to(device)
+                logits = torch.softmax(logits, dim=1)
+                preds = torch.argmax(logits, dim=1)
+                labels = batch['labels']
+                logits_list.extend(logits)
+                
+            elif self.lm_type in ['LLaMA']:
+                preds = model.generate(batch, text_dataset.data, prompts)
+                labels = batch['label_text']
+
+            preds_list.extend(preds)
+            labels_list.extend(labels)
+
+        if self.lm_type in ['RoBERTa']:
+            logits = torch.stack(logits_list, dim=0)
+            labels = torch.stack(labels_list, dim=0)
+            preds = torch.stack(preds_list, dim=0)
+        elif self.lm_type in ['LLaMA']:
+            logits = None
+            labels = labels_list
+            preds = preds_list
+
+        acc, f1 = self.get_metric(logits, preds, labels)
+
+        return acc, f1
 
     @torch.no_grad()
-    def evaluate(self, model, text_dataset, test_loader, class_num, config, device, prompts=None):
+    def evaluate(self, model, text_dataset, test_loader, class_dst, config, device, prompts=None):
         model.eval()
         logits_list, preds_list, labels_list = [], [], []
         for _, batch in enumerate(test_loader):
@@ -290,7 +327,7 @@ class GraphPrompter(BaseModel):
 
             if self.lm_type in ['RoBERTa']:
                 logits = model(batch, text_dataset.data)
-                logits = torch.softmax(logits[:, : class_num], dim=1)
+                logits = torch.softmax(logits[:, : class_dst], dim=1)
                 preds = torch.argmax(logits, dim=1)
                 labels = batch['labels']
                 logits_list.extend(logits)
@@ -325,11 +362,11 @@ class GraphPrompter(BaseModel):
             if curr_session != 0:
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
 
-            class_num, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
+            class_src, class_dst, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
             
             prompts = None
             if self.lm_type in ['LLaMA']:
-                label_text = label_text_list[ :class_num]
+                label_text = label_text_list[ :class_dst]
                 prompts = get_genreal_prompts(self.dataset, label_text)
 
             progress_bar = tqdm(range(self.config['epochs']))
@@ -337,11 +374,11 @@ class GraphPrompter(BaseModel):
 
             tolerate, best_acc_valid = 0, 0.
             for epoch in range(self.config['epochs']):
-                loss = self.train(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_num, self.config, self.device, prompts)
+                loss = self.train(curr_session, epoch, self.model, text_dataset_iso, train_loader, optimizer, class_src, class_dst, self.config, self.device, prompts)
                 progress_bar.write("Session: {} | Epoch: {} | Loss: {:.4f}".format(curr_session, epoch, loss))
 
                 if epoch > 0 and epoch % self.config['valid_epoch'] == 0:
-                    acc_valid, f1_valid = self.valid(self.model, text_dataset_iso, valid_loader, class_num, self.config, self.device, prompts)
+                    acc_valid, f1_valid = self.valid(self.model, text_dataset_iso, valid_loader, class_src, class_dst, self.config, self.device, prompts)
                     progress_bar.write("Session: {} | Epoch: {} | Acc Val: {:.4f} | F1 Val: {:.4f} | Tolerate: {}".format(curr_session, epoch, acc_valid, f1_valid, tolerate))
                     if acc_valid > best_acc_valid:
                         tolerate = 0
@@ -362,13 +399,13 @@ class GraphPrompter(BaseModel):
             progress_bar.close()
 
             _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
-            curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device, prompts)
-            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_num, self.config, self.device, prompts)
+            curr_acc_test_isolate, curr_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device, prompts)
+            curr_acc_test_joint, curr_f1_test_joint = self.evaluate(self.model, text_dataset_joint, test_loader_joint, class_dst, self.config, self.device, prompts)
 
             acc_list = []
             for s in range(curr_session):
-                _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
-                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_num, self.config, self.device, prompts)
+                _, _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
+                prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device, prompts)
                 acc_list.append(prev_acc_test_isolate)
             acc_list.append(curr_acc_test_isolate)
 
