@@ -1,26 +1,28 @@
 import copy
 import torch
 import random
-from torch.utils.data import Subset, DataLoader
+import numpy as np
 
+from torch.utils.data import Subset, DataLoader
+from collections import defaultdict
 
 class TaskLoader():
         
-    def __init__(self, batch_size, text_dataset, cl_type, task_type, session_size, split_ratio):
+    def __init__(self, batch_size, text_dataset, cl_type, task_type, base_session, novel_session, ways, sessions, base_train_shots, train_shots, valid_shots, test_shots):
         self.batch_size = batch_size
         self.text_dataset = text_dataset
         self.data = text_dataset.data
         self.id_by_class = text_dataset.id_by_class
         self.cl_type = cl_type
         self.task_type = task_type
-        self.session_size = session_size
-        self.train_ratio = split_ratio[0]
-        self.valid_ratio = split_ratio[1]
-        self.test_ratio = split_ratio[2]
-
-        if self.cl_type == 'class':
-            if self.task_type == 'normal':
-                self.task_num = (self.data.y.max().item() + 1) // self.session_size
+        self.base_session = base_session
+        self.novel_session = novel_session
+        self.ways = ways
+        self.sessions = sessions
+        self.base_train_shots = base_train_shots
+        self.train_shots = train_shots
+        self.valid_shots = valid_shots
+        self.test_shots = test_shots
 
         # Task Split
         node_idx_per_class, train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint = self._split_data()
@@ -34,12 +36,12 @@ class TaskLoader():
 
     def get_joint_task(self, ):
         all_train_idx, all_valid_idx, all_test_idx = [], [], []
-        for task_id in range(self.task_num):
+        for task_id in range(self.sessions):
             all_train_idx.extend(self.train_idx_per_task[task_id])
             all_valid_idx.extend(self.valid_idx_per_task[task_id])
             all_test_idx.extend(self.test_idx_per_task_isolate[task_id])
 
-        text_dataset = self.dataset_per_task_joint[self.task_num - 1]
+        text_dataset = self.dataset_per_task_joint[self.sessions - 1]
 
         train_dataset = Subset(text_dataset, all_train_idx)
         val_dataset = Subset(text_dataset, all_valid_idx)
@@ -54,8 +56,8 @@ class TaskLoader():
         return class_num, text_dataset, train_loader, valid_loader, test_loader
 
     def get_task(self, task_id, subset = -1):
-        if task_id >= self.task_num:
-            raise f"Task id {task_id} is larger than total number of tasks {self.task_num} !"
+        if task_id >= self.sessions:
+            raise f"Task id {task_id} is larger than total number of tasks {self.sessions} !"
         
         train_idx = self.train_idx_per_task[task_id]
         valid_idx = self.valid_idx_per_task[task_id]
@@ -63,8 +65,8 @@ class TaskLoader():
         test_idx_joint = self.test_idx_per_task_joint[task_id]
         
         if subset != -1:
-            train_idx = random.sample(train_idx, min(len(train_idx), subset))
-            valid_idx = random.sample(valid_idx, min(len(valid_idx), subset))
+            train_idx = self._stratified_sample(train_idx, self.data.y[train_idx], subset)
+            valid_idx = self._stratified_sample(valid_idx, self.data.y[valid_idx], subset)
 
         text_dataset_isolate = self.dataset_per_task_isolate[task_id]
         text_dataset_joint = self.dataset_per_task_joint[task_id]
@@ -79,18 +81,17 @@ class TaskLoader():
         test_loader_isolate = DataLoader(test_dataset_isolate, batch_size=self.batch_size, shuffle=False)
         test_loader_joint = DataLoader(test_dataset_joint, batch_size=self.batch_size, shuffle=False)
 
-        class_num = self.data.y[train_idx].max().item() + 1
+        if self.task_type == 'GFSCIL':
+            if task_id == 0: # Base Session
+                class_src, class_dst = 0, self.base_session
+            else:
+                class_src, class_dst = self.base_session + (task_id - 1) * self.ways, self.base_session + task_id * self.ways
+        elif self.task_type == 'GCIL':
+            class_src, class_dst = task_id * self.ways, (task_id + 1) * self.ways
 
-        return class_num, text_dataset_isolate, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint
+        return class_src, class_dst, text_dataset_isolate, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint
 
     def _split_data(self, ):
-        if self.cl_type == 'class':
-            if self.task_type == 'normal':
-                spliter = self._normal_cls_cl_spliter
-    
-        return spliter()
-
-    def _normal_cls_cl_spliter(self, ):
         node_idx_per_class = []
         train_idx_per_task = []
         valid_idx_per_task = []
@@ -101,18 +102,39 @@ class TaskLoader():
 
         all_class = self.data.y.unique(sorted=True).tolist()
 
-        for i in range(self.task_num):
-            curr_task_class_idx = all_class[i * self.session_size : (i + 1) * self.session_size]
+        for i in range(self.sessions):
             node_idx_curr_class = []
             train_idx_curr_task = []
             valid_idx_curr_task = []
             test_idx_curr_task = []
 
+            if self.task_type == 'GFSCIL':
+                if i == 0: # Base Session
+                    curr_task_class_idx = all_class[ : self.base_session]
+                else:
+                    curr_task_class_idx = all_class[self.base_session + (i - 1) * self.ways : self.base_session + i * self.ways]
+            elif self.task_type == 'GCIL':
+                curr_task_class_idx = all_class[i * self.ways : (i + 1) * self.ways]
+
             for cla in curr_task_class_idx:
                 node_idx = self.id_by_class[cla]
                 node_idx_curr_class.extend(node_idx)
                 node_num = len(node_idx)
-                train_num, valid_num, test_num = int(node_num * self.train_ratio), int(node_num * self.valid_ratio), int(node_num * self.test_ratio)
+
+                if self.task_type == 'GFSCIL':
+                    if i == 0: # Base Session
+                        train_shots, valid_shots, test_shots = self.base_train_shots, self.valid_shots, self.test_shots
+                    else:
+                        train_shots, valid_shots, test_shots = self.train_shots, self.valid_shots, self.test_shots
+                elif self.task_type == 'GCIL':
+                    train_shots, valid_shots, test_shots = self.train_shots, self.valid_shots, self.test_shots
+
+                if node_num < (train_shots + valid_shots + test_shots):
+                    train_num, valid_num, test_num = int(node_num * 0.5), int(node_num * 0.1), int(node_num * 0.4)
+                    if (train_num + valid_num + test_num) > node_num:
+                        train_num -= train_num + valid_num + test_num - node_num
+                else:
+                    train_num, valid_num, test_num = train_shots, valid_shots, test_shots
                 random.shuffle(node_idx)
 
                 train_idx_curr_task.extend(node_idx[: train_num])
@@ -129,12 +151,22 @@ class TaskLoader():
             else:
                 test_idx_per_task_joint.append(test_idx_curr_task)
 
-            curr_dataset = self._adjust_graph(all_class[i * self.session_size : (i + 1) * self.session_size])
+            if self.task_type == 'GFSCIL':
+                if i == 0: # Base Session
+                    curr_dataset = self._adjust_graph(all_class[ : self.base_session])
+                    prev_dataset = self._adjust_graph(all_class[ : self.base_session])
+                else:
+                    curr_dataset = self._adjust_graph(all_class[self.base_session + (i - 1) * self.ways : self.base_session + i * self.ways])
+                    prev_dataset = self._adjust_graph(all_class[: self.base_session + i * self.ways])
+            elif self.task_type == 'GCIL':
+                curr_dataset = self._adjust_graph(all_class[i * self.ways : (i + 1) * self.ways])
+                prev_dataset = self._adjust_graph(all_class[: (i + 1) * self.ways])
+
             dataset_per_task_isolate.append(curr_dataset)
-            prev_dataset = self._adjust_graph(all_class[: (i + 1) * self.session_size])
             dataset_per_task_joint.append(prev_dataset)
 
         return node_idx_per_class, train_idx_per_task, valid_idx_per_task, test_idx_per_task_isolate, test_idx_per_task_joint, dataset_per_task_isolate, dataset_per_task_joint
+
 
     def _adjust_graph(self, class_id):
         node_mask = torch.zeros(len(self.data.y), dtype=torch.bool)
@@ -152,3 +184,30 @@ class TaskLoader():
         text_dataset.data.edge_index = new_edge_index
 
         return text_dataset
+
+    def _stratified_sample(self, indices, labels, n_samples):
+        label_to_indices = defaultdict(list)
+        for idx, label in zip(indices, labels):
+            label_to_indices[label.item()].append(idx)
+
+        unique_labels = list(label_to_indices.keys())
+        label_counts = [len(label_to_indices[l]) for l in unique_labels]
+        proportions = np.array(label_counts) / sum(label_counts)
+        samples_per_label = (proportions * n_samples).astype(int)
+
+        samples_per_label = np.maximum(samples_per_label, 1)
+        total = sum(samples_per_label)
+
+        while total > n_samples:
+            max_idx = np.argmax(samples_per_label)
+            if samples_per_label[max_idx] > 1:
+                samples_per_label[max_idx] -= 1
+                total -= 1
+
+        sampled_indices = []
+        for i, label in enumerate(unique_labels):
+            sample_size = samples_per_label[i]
+            sampled = random.sample(label_to_indices[label], min(sample_size, len(label_to_indices[label])))
+            sampled_indices.extend(sampled)
+
+        return sampled_indices

@@ -102,18 +102,18 @@ class TextDataset(Dataset):
         for id, cla in enumerate(labels):
             id_by_class[cla.item()].append(id)
 
-        # num_nodes = [len(v) for _, v in id_by_class.items()]
-        # sorted_class_idx = heapq.nlargest(labels.max().item() + 1, enumerate(num_nodes), key=lambda x: x[1])
+        num_nodes = [len(v) for _, v in id_by_class.items()]
+        sorted_class_idx = heapq.nlargest(labels.max().item() + 1, enumerate(num_nodes), key=lambda x: x[1])
 
-        # # Re-order labels
-        # for i, (id, _) in enumerate(sorted_class_idx):
-        #     class_idx = id_by_class[id]
-        #     labels[class_idx] = i
+        # Re-order labels
+        for i, (id, _) in enumerate(sorted_class_idx):
+            class_idx = id_by_class[id]
+            labels[class_idx] = i
 
-        # class_list = labels.unique().numpy()
-        # id_by_class = {i: [] for i in class_list}
-        # for id, cla in enumerate(labels):
-        #     id_by_class[cla.item()].append(id)
+        class_list = labels.unique().numpy()
+        id_by_class = {i: [] for i in class_list}
+        for id, cla in enumerate(labels):
+            id_by_class[cla.item()].append(id)
 
         print(f"--------------------------------------------")
         print(f"Load dataset {self.dataset}!")

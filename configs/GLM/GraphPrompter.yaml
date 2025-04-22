@@ -1,5 +1,5 @@
 default:
-  lm: 'RoBERTa' # ['RoBERTa', 'LLaMA']
+  lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
   seed: [0, 1, 2, 3, 4]
   epochs: 20
   valid_epoch: 1

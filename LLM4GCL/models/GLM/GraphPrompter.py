@@ -246,7 +246,6 @@ class GraphPrompter(BaseModel):
 
     def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device, prompts=None):
         model.train()
-        accum_loss = 0.
         all_loss, train_num = 0., 0
         for step, batch in enumerate(train_loader):
             if batch['node_id'].size(0) < 2:
@@ -267,18 +266,13 @@ class GraphPrompter(BaseModel):
                 loss = outputs.loss
 
             loss.backward()
+            all_loss += loss * batch['node_id'].size(0)
+            train_num += batch['node_id'].size(0)
 
             clip_grad_norm_(optimizer.param_groups[0]['params'], 0.1)
             if (step + 1) % config['grad_steps'] == 0:
                 adjust_learning_rate(optimizer.param_groups[0], step / len(train_loader) + curr_epoch, config)
             optimizer.step()
-            accum_loss = accum_loss + loss.item()
-
-            if (step + 1) % config['grad_steps'] == 0:
-                all_loss += accum_loss * batch['node_id'].size(0)
-                train_num += batch['node_id'].size(0)
-                lr = optimizer.param_groups[0]["lr"]
-                accum_loss = 0.
 
         return all_loss / train_num
 

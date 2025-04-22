@@ -8,10 +8,31 @@ from LLM4GCL.common.utils import load_config, merge_params, update_config, selec
 
 
 model_dict = {
-    'GNN': ['BareGNN', 'JointGNN', 'EWC', 'MAS', 'GEM', 'LwF', 'cosine', 'ERGNN', 'SSM', 'TPP'],
-    'LM': ['BareLM', 'SimpleCIL'], 
-    'GLM': ['LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM'], 
+    'GNN': ['BareGNN', 'EWC', 'LwF', 'cosine', 'Geometer', 'TEEN', 'TAP'],
+    'LM': ['RoBERTa', 'LLaMA', 'SimpleCIL', 'InstructLM'], 
+    'GLM': ['LM_emb', 'GraphPrompter', 'ENGINE', 'SimGCL'], 
 }
+
+exp_settings = {
+    'GCIL': {
+        'ways': {'cora': 2, 'citeseer': 2, 'wikics': 3, 'photo': 3, 'products': 4, 'arxiv_23': 4, 'arxiv': 4},
+        'sessions': {'cora': 3, 'citeseer': 3, 'wikics': 3, 'photo': 4, 'products': 8, 'arxiv_23': 9, 'arxiv': 10},
+        'train_shots': {'cora': 100, 'citeseer': 100, 'wikics': 200, 'photo': 400, 'products': 400, 'arxiv_23': 400, 'arxiv': 800},
+        'valid_shots': {'cora': 50, 'citeseer': 50, 'wikics': 50, 'photo': 50, 'products': 50, 'arxiv_23': 50, 'arxiv': 50},
+        'test_shots': {'cora': 100, 'citeseer': 100, 'wikics': 200, 'photo': 400, 'products': 400, 'arxiv_23': 400, 'arxiv': 800},
+    },
+    'GFSCIL': {
+        'base_session': {'cora': 3, 'citeseer': 2, 'wikics': 4, 'photo': 4, 'products': 11, 'arxiv_23': 13, 'arxiv': 12},
+        'novel_session': {'cora': 4, 'citeseer': 4, 'wikics': 6, 'photo': 8, 'products': 20, 'arxiv_23': 24, 'arxiv': 28},
+        'ways': {'cora': 2, 'citeseer': 2, 'wikics': 3, 'photo': 4, 'products': 4, 'arxiv_23': 4, 'arxiv': 4},
+        'sessions': {'cora': 3, 'citeseer': 3, 'wikics': 3, 'photo': 3, 'products': 6, 'arxiv_23': 7, 'arxiv': 8},
+        'base_train_shots': {'cora': 100, 'citeseer': 100, 'wikics': 200, 'photo': 400, 'products': 400, 'arxiv_23': 400, 'arxiv': 800},
+        'train_shots': {'cora': 5, 'citeseer': 5, 'wikics': 5, 'photo': 5, 'products': 5, 'arxiv_23': 5, 'arxiv': 5},
+        'valid_shots': {'cora': 50, 'citeseer': 50, 'wikics': 50, 'photo': 50, 'products': 50, 'arxiv_23': 50, 'arxiv': 50},
+        'test_shots': {'cora': 100, 'citeseer': 100, 'wikics': 200, 'photo': 400, 'products': 400, 'arxiv_23': 400, 'arxiv': 800},
+    }
+}
+
 
 if __name__ == '__main__':
 
@@ -34,17 +55,18 @@ if __name__ == '__main__':
                             ' "GNN": Use only Graph Neural Network (GNN) for training and inference. '
                             ' "LM": Use only Language Model (LM) for training and inference. '
                             ' "GLM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
-    parser.add_argument('--model', type=str, default='SimpleCIL', help='the name of model, must match with the model_type')
+    parser.add_argument('--model', type=str, default='LwF', help='the name of model, must match with the model_type')
     parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
     parser.add_argument('--ckpt_path', type=str, default='/root/autodl-tmp/ckpt/', help='the path to store best model weights')
 
     # Settings
     parser.add_argument('--cl_type', type=str, default='class', choices=['class'], help='The type of CL. E.g., class is for class incremental learning')
-    parser.add_argument('--task_type', type=str, default='normal', choices=['normal'], help='The type of continual tasks.')
-    parser.add_argument('--session_size', type=int, default=2, help='The number of classes in each CL session')
-    parser.add_argument('--split_ratio', type=list, default=[0.6, 0.2, 0.2], help='The ratio to split data into train/valid/test datasets.')
+    parser.add_argument('--task_type', type=str, default='GCIL', choices=['GCIL', 'GFSCIL'], help='The type of continual tasks.')
+    # parser.add_argument('--session_size', type=int, default=2, help='The number of classes in each CL session')
+    # parser.add_argument('--split_ratio', type=list, default=[0.6, 0.2, 0.2], help='The ratio to split data into train/valid/test datasets.')
 
     # Training
+    parser.add_argument('--local_ce', type=bool, default=True, help='whether to use local cross entropy')
     parser.add_argument('--ntrail', type=int, default=1, help='repetition count of experiments')
     parser.add_argument('--gpu_num', type=int, default=0, help='the selected GPU number')
 
@@ -56,9 +78,23 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     assert args.model in model_dict[args.model_type], f"Model type '{args.model_type}' does not support model '{args.model}'."
-    assert args.split_ratio[0] + args.split_ratio[1] + args.split_ratio[2] <= 1, f"The sum of split ratio is larger than 1."
+    # assert args.split_ratio[0] + args.split_ratio[1] + args.split_ratio[2] <= 1, f"The sum of split ratio is larger than 1."
     args.config_path = './configs/{}/{}.yaml'.format(args.model_type, args.model)
     config = load_config(args.config_path)
+
+    if args.task_type == 'GFSCIL':
+        args.base_session = exp_settings[args.task_type]['base_session'][args.dataset]
+        args.novel_session = exp_settings[args.task_type]['novel_session'][args.dataset]
+        args.base_train_shots = exp_settings[args.task_type]['base_train_shots'][args.dataset]
+    elif args.task_type == 'GCIL':
+        args.base_session = None
+        args.novel_session = None
+        args.base_train_shots = None
+    args.ways = exp_settings[args.task_type]['ways'][args.dataset]
+    args.sessions = exp_settings[args.task_type]['sessions'][args.dataset]
+    args.train_shots = exp_settings[args.task_type]['train_shots'][args.dataset]
+    args.valid_shots = exp_settings[args.task_type]['valid_shots'][args.dataset]
+    args.test_shots = exp_settings[args.task_type]['test_shots'][args.dataset]
 
     if args.hyperparam_search:
 

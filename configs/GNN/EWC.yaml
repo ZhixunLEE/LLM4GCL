@@ -18,3 +18,47 @@ search_space:
   gnn: ['GCN', 'SAGE']
   lr: [1e-5, 1e-4, 1e-3]
   ewc_strength: [1, 100, 10000]
+best_cora:
+  gnn: GCN
+  lr: '1e-5'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-04-21T21:46:14.571099'
+    metrics:
+      Iso. Avg ACC: '0.3358'
+      Iso. Avg FGT: '-0.9255'
+      Jot. Avg ACC: '0.5988'
+      Jot. Last ACC: '0.3387'
+best_citeseer:
+  gnn: SAGE
+  lr: '1e-3'
+  ewc_strength: 100
+  _meta:
+    updated_at: '2025-04-21T21:49:20.619185'
+    metrics:
+      Iso. Avg ACC: '0.2940'
+      Iso. Avg FGT: '-0.8175'
+      Jot. Avg ACC: '0.5227'
+      Jot. Last ACC: '0.2857'
+best_wikics:
+  gnn: GCN
+  lr: '1e-4'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-04-21T21:57:43.982170'
+    metrics:
+      Iso. Avg ACC: '0.3270'
+      Iso. Avg FGT: '-0.9057'
+      Jot. Avg ACC: '0.5921'
+      Jot. Last ACC: '0.3131'
+best_photo:
+  gnn: SAGE
+  lr: '1e-4'
+  ewc_strength: 1
+  _meta:
+    updated_at: '2025-04-21T22:54:15.344517'
+    metrics:
+      Iso. Avg ACC: '0.2080'
+      Iso. Avg FGT: '-0.7944'
+      Jot. Avg ACC: '0.4046'
+      Jot. Last ACC: '0.1790'

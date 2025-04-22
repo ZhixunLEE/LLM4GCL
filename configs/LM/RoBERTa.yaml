@@ -13,13 +13,11 @@ default:
   patience: 5
   batch_size: 10
   max_length: 256
+
   LoRA:
     use_lora: True
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05
-
-  simplecil_T: 1.0
-  simplecil_sample_num: 20
 search_space:
   lr: [1e-4, 2e-4, 5e-4]

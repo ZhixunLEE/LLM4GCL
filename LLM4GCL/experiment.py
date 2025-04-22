@@ -20,9 +20,17 @@ class Experiment(object):
         
         self.cl_type = args.cl_type
         self.task_type = args.task_type
-        self.session_size = args.session_size
-        self.split_ratio = args.split_ratio
 
+        self.base_session = args.base_session
+        self.novel_session = args.novel_session
+        self.ways = args.ways
+        self.sessions = args.sessions
+        self.base_train_shots = args.base_train_shots
+        self.train_shots = args.train_shots
+        self.valid_shots = args.valid_shots
+        self.test_shots = args.test_shots
+
+        self.local_ce = args.local_ce
         self.ntrail = args.ntrail
         self.device = torch.device("cuda:" + str(args.gpu_num) if torch.cuda.is_available() else "cpu")
 
@@ -37,8 +45,15 @@ class Experiment(object):
                                       text_dataset=self.text_dataset, 
                                       cl_type=self.cl_type, 
                                       task_type=self.task_type, 
-                                      session_size=self.session_size, 
-                                      split_ratio=self.split_ratio)
+                                      base_session=self.base_session, 
+                                      novel_session=self.novel_session, 
+                                      ways=self.ways, 
+                                      sessions=self.sessions, 
+                                      base_train_shots=self.base_train_shots,
+                                      train_shots=self.train_shots, 
+                                      valid_shots=self.valid_shots, 
+                                      test_shots=self.test_shots)
+
         
     def run(self, ):
         assert self.ntrail <= len(self.config['seed']), f"repetition num is larger than the length of seed list!"
@@ -58,9 +73,10 @@ class Experiment(object):
                     checkpoint_path=self.ckpt_path, 
                     dataset=self.dataset, 
                     model_name=self.model_name, 
+                    local_ce=self.local_ce,
                     seed=seed, 
                     device=self.device)
-            elif self.model_name in ['BareLM', 'SimpleCIL', 'OLoRA', 'LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM']:
+            elif self.model_name in ['RoBERTa', 'LLaMA', 'SimpleCIL', 'LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
@@ -69,6 +85,7 @@ class Experiment(object):
                     dataset=self.dataset, 
                     model_name=self.model_name, 
                     model_path=self.model_path,
+                    local_ce=self.local_ce,
                     seed=seed, 
                     device=self.device
                 )

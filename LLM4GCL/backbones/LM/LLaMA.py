@@ -16,7 +16,7 @@ class LLaMANet(torch.nn.Module):
         self.lora_config = lora_config
         self.dropout = dropout
         self.att_dropout = att_dropout
-        self.max_ans_length = 16
+        self.max_ans_length = 32
 
         quant_config = BitsAndBytesConfig(
             load_in_4bit=True,
