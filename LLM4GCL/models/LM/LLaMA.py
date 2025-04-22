@@ -144,7 +144,6 @@ class LLaMA(BaseModel):
                 adjust_learning_rate(optimizer.param_groups[0], step / len(train_loader) + curr_epoch, config)
             optimizer.step()
 
-        print(train_num)
         return all_loss / train_num
 
     @torch.no_grad()
@@ -180,8 +179,6 @@ class LLaMA(BaseModel):
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
 
             _, class_dst, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
-            print(len(self.task_loader.train_idx_per_task[0]))
-            quit()
 
             label_text = label_text_list[ :class_dst]
             prompts = get_genreal_prompts(self.dataset, label_text)
