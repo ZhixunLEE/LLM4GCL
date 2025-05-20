@@ -23,8 +23,8 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
         tokenizer = AutoTokenizer.from_pretrained("roberta-large")
         model = AutoModel.from_pretrained("roberta-large", output_hidden_states=True, return_dict=True, cache_dir=model_path).to(device)
     elif model_name == 'LLaMA':
-        model_name_str = 'Llama-3.1-8B'
-        model_path = os.path.join(model_path, 'models--' + model_name_str.lower())
+        model_name_str = 'meta-llama/Llama-3.1-8B'
+        model_path = os.path.join(model_path)
         tokenizer = AutoTokenizer.from_pretrained(model_path)
         model = AutoModel.from_pretrained(model_path, output_hidden_states=True, return_dict=True, load_in_4bit=True).to(device)
         tokenizer.pad_token = tokenizer.eos_token
