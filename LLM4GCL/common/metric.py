@@ -34,3 +34,11 @@ class CLMetric():
         last_acc_jot = all_task_acc[-1]
 
         return avg_acc_iso, avg_fgt_iso, avg_acc_jot, last_acc_jot
+
+
+def compute_metrics(p):
+    from sklearn.metrics import accuracy_score
+    pred, labels = p
+    pred = np.argmax(pred, axis=1)
+    accuracy = accuracy_score(y_true=labels, y_pred=pred)
+    return {"accuracy": accuracy}

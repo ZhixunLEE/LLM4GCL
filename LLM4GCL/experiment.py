@@ -65,7 +65,7 @@ class Experiment(object):
             # Model Initialization
             result_logger = CLMetric()
             
-            if self.model_name in ['BareGNN', 'EWC', 'LwF', 'cosine', 'TEEN']:
+            if self.model_name in ['BareGNN', 'EWC', 'LwF', 'cosine', 'TEEN', 'TPP']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 
@@ -76,7 +76,7 @@ class Experiment(object):
                     local_ce=self.local_ce,
                     seed=seed, 
                     device=self.device)
-            elif self.model_name in ['RoBERTa', 'LLaMA', 'SimpleCIL', 'LM_emb', 'GraphPrompter', 'ENGINE', 'InstructLM', 'SimGCL']:
+            elif self.model_name in ['BERT', 'RoBERTa', 'LLaMA', 'SimpleCIL', 'LM_emb', 'GraphPrompter', 'ENGINE', 'LLaGA', 'GraphGPT', 'SimGCL']:
                 model = getattr(models, self.model_name)(
                     task_loader=self.task_loader, 
                     result_logger=result_logger, 

@@ -41,7 +41,6 @@ class LwF(BareGNN):
             prev_output = self.prev_model(data.x[subset].to(device), edge_index.to(device))[mapping]
 
             if self.local_ce:
-                
                 logits = output[:, class_src : class_dst]
                 labels = batch['labels'].to(device) - class_src
             else:

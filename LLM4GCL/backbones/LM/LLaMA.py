@@ -4,19 +4,29 @@ import torch.nn as nn
 
 from peft import LoraConfig, get_peft_model
 
-from transformers import BitsAndBytesConfig
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import BitsAndBytesConfig, AutoTokenizer, AutoModelForCausalLM
 
 class LLaMANet(torch.nn.Module):
 
     def __init__(self, model_path, lora_config, dropout, att_dropout):
         super(LLaMANet, self).__init__()
-        self.model_name = 'Llama-3.1-8B'
-        self.model_path = os.path.join(model_path, 'models--' + self.model_name.lower())
+
+        access_token = ''
+
+        # self.model_name = 'meta-llama/Llama-3.1-8B'
+        self.model_name = 'meta-llama/Llama-3.2-3B'
+        # self.model_name = 'meta-llama/Llama-3.2-1B'
+        self.model_path = model_path
         self.lora_config = lora_config
         self.dropout = dropout
         self.att_dropout = att_dropout
         self.max_ans_length = 32
+        if self.model_name == 'meta-llama/Llama-3.1-8B':
+            self.hidden_dim = 4096
+        elif self.model_name == 'meta-llama/Llama-3.2-1B':
+            self.hidden_dim = 2048
+        elif self.model_name == 'meta-llama/Llama-3.2-3B':
+            self.hidden_dim = 3072
 
         quant_config = BitsAndBytesConfig(
             load_in_4bit=True,
@@ -25,17 +35,19 @@ class LLaMANet(torch.nn.Module):
             bnb_4bit_quant_type="nf4"
         )
 
-        self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)   
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name, token=access_token)   
         model = AutoModelForCausalLM.from_pretrained(
-            # self.model_name, 
-            self.model_path,
+            self.model_name, 
+            cache_dir=self.model_path,
             device_map="auto",
             quantization_config=quant_config,
+            token=access_token
         )
 
         model.config.dropout = self.dropout
         model.config.attention_dropout = self.att_dropout
         model.config.output_hidden_states = True
+        
         self.tokenizer.pad_token_id = 0
         self.tokenizer.padding_side = 'left'
         self.embeddings = model.get_input_embeddings()

@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import RoBERTaNet, LLaMANet
+from LLM4GCL.backbones import RoBERTaNet, LLaMANet, BERTNet
 from LLM4GCL.common.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
@@ -19,8 +19,6 @@ class SimpleCIL(BaseModel):
     def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, local_ce, seed, device):
         super(SimpleCIL, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
         self.lm_type = config['lm']
-        if self.lm_type == 'RoBERTa':
-            self.hidden_dim = 1024
         self.output_dim = self.num_class
         self.lr = float(config['lr'])
         self.weight_decay = float(config['weight_decay'])
@@ -35,7 +33,7 @@ class SimpleCIL(BaseModel):
 
         class LMModel(nn.Module):
 
-            def __init__(self, lm_type, max_length, model_path, hidden_dim, output_dim, lora_config, dropout, att_dropout, T, device):
+            def __init__(self, lm_type, max_length, model_path, output_dim, lora_config, dropout, att_dropout, T, device):
                 super(LMModel, self).__init__()
                 self.device = device
                 self.max_length = max_length
@@ -44,8 +42,11 @@ class SimpleCIL(BaseModel):
                 
                 if lm_type == 'RoBERTa':
                     self.lm = RoBERTaNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
+                elif lm_type == 'BERT':
+                    self.lm = BERTNet(output_dim, model_path, lora_config, dropout, att_dropout).to(device)
 
-                self.fc = nn.Linear(hidden_dim, output_dim).to(device)
+                self.hidden_dim = self.lm.hidden_dim
+                self.fc = nn.Linear(self.hidden_dim, output_dim).to(device)
 
             def forward(self, samples):
                 tokens = self.lm.tokenizer(samples['raw_text'], padding=True, truncation=True, max_length=self.max_length, return_tensors='pt')
@@ -66,7 +67,7 @@ class SimpleCIL(BaseModel):
 
                 return logits
             
-        self.model = LMModel(self.lm_type, self.max_length, self.model_path, self.hidden_dim, self.output_dim, self.lora_config, self.dropout, self.att_dropout, self.T, self.device)
+        self.model = LMModel(self.lm_type, self.max_length, self.model_path, self.output_dim, self.lora_config, self.dropout, self.att_dropout, self.T, self.device)
 
     @torch.no_grad()
     def update_proto(self, model, data, train_loader, class_src, class_dst, config, device):

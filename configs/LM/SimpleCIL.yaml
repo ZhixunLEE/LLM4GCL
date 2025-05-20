@@ -1,5 +1,5 @@
 default:
-  lm: 'RoBERTa'
+  lm: 'BERT' # RoBERTa
   seed: [0, 1, 2, 3, 4]
   epochs: 20
   valid_epoch: 1
@@ -11,10 +11,10 @@ default:
   dropout: 0.1
   att_dropout: 0.1
   patience: 5
-  batch_size: 10
+  batch_size: 30
   max_length: 256
   LoRA:
-    use_lora: True
+    use_lora: true
     lora_r: 5
     lora_alpha: 16
     lora_dropout: 0.05
@@ -23,3 +23,66 @@ default:
   simplecil_sample_num: 20
 search_space:
   lr: [1e-4, 2e-4, 5e-4]
+best_cora:
+  lr: '5e-4'
+  _meta:
+    updated_at: '2025-04-26T01:33:37.965036'
+    metrics:
+      Iso. Avg ACC: '0.5139'
+      Iso. Avg FGT: '-0.0917'
+      Jot. Avg ACC: '0.6814'
+      Jot. Last ACC: '0.5443'
+best_citeseer:
+  lr: '2e-4'
+  _meta:
+    updated_at: '2025-04-26T01:42:39.280715'
+    metrics:
+      Iso. Avg ACC: '0.5083'
+      Iso. Avg FGT: '-0.1025'
+      Jot. Avg ACC: '0.6694'
+      Jot. Last ACC: '0.5083'
+best_wikics:
+  lr: '5e-4'
+  _meta:
+    updated_at: '2025-04-26T01:58:11.248272'
+    metrics:
+      Iso. Avg ACC: '0.6787'
+      Iso. Avg FGT: '-0.0523'
+      Jot. Avg ACC: '0.7663'
+      Jot. Last ACC: '0.6935'
+best_photo:
+  lr: '1e-4'
+  _meta:
+    updated_at: '2025-04-26T02:37:27.652803'
+    metrics:
+      Iso. Avg ACC: '0.5396'
+      Iso. Avg FGT: '-0.1172'
+      Jot. Avg ACC: '0.6759'
+      Jot. Last ACC: '0.5396'
+best_products:
+  lr: '1e-4'
+  _meta:
+    updated_at: '2025-04-26T04:27:22.007982'
+    metrics:
+      Iso. Avg ACC: '0.4701'
+      Iso. Avg FGT: '-0.1438'
+      Jot. Avg ACC: '0.5978'
+      Jot. Last ACC: '0.4664'
+best_arxiv_23:
+  lr: '2e-4'
+  _meta:
+    updated_at: '2025-04-26T07:10:55.236370'
+    metrics:
+      Iso. Avg ACC: '0.4256'
+      Iso. Avg FGT: '-0.1311'
+      Jot. Avg ACC: '0.4914'
+      Jot. Last ACC: '0.3935'
+best_arxiv:
+  lr: '1e-4'
+  _meta:
+    updated_at: '2025-04-26T11:51:46.718239'
+    metrics:
+      Iso. Avg ACC: '0.3424'
+      Iso. Avg FGT: '-0.1256'
+      Jot. Avg ACC: '0.4626'
+      Jot. Last ACC: '0.3497'

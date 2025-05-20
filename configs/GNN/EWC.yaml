@@ -1,5 +1,5 @@
 default:
-  gnn: 'SAGE'
+  gnn: 'GCN'
   seed: [0, 1, 2, 3, 4]
   epochs: 300
   valid_epoch: 10
@@ -23,42 +23,75 @@ best_cora:
   lr: '1e-5'
   ewc_strength: 10000
   _meta:
-    updated_at: '2025-04-21T21:46:14.571099'
+    updated_at: '2025-04-24T08:13:24.492887'
     metrics:
-      Iso. Avg ACC: '0.3358'
-      Iso. Avg FGT: '-0.9255'
-      Jot. Avg ACC: '0.5988'
-      Jot. Last ACC: '0.3387'
+      Iso. Avg ACC: '0.4022'
+      Iso. Avg FGT: '-0.6467'
+      Jot. Avg ACC: '0.5715'
+      Jot. Last ACC: '0.3486'
 best_citeseer:
-  gnn: SAGE
-  lr: '1e-3'
-  ewc_strength: 100
-  _meta:
-    updated_at: '2025-04-21T21:49:20.619185'
-    metrics:
-      Iso. Avg ACC: '0.2940'
-      Iso. Avg FGT: '-0.8175'
-      Jot. Avg ACC: '0.5227'
-      Jot. Last ACC: '0.2857'
-best_wikics:
   gnn: GCN
-  lr: '1e-4'
-  ewc_strength: 10000
-  _meta:
-    updated_at: '2025-04-21T21:57:43.982170'
-    metrics:
-      Iso. Avg ACC: '0.3270'
-      Iso. Avg FGT: '-0.9057'
-      Jot. Avg ACC: '0.5921'
-      Jot. Last ACC: '0.3131'
-best_photo:
-  gnn: SAGE
-  lr: '1e-4'
+  lr: '1e-3'
   ewc_strength: 1
   _meta:
-    updated_at: '2025-04-21T22:54:15.344517'
+    updated_at: '2025-04-24T08:15:02.695754'
     metrics:
-      Iso. Avg ACC: '0.2080'
-      Iso. Avg FGT: '-0.7944'
-      Jot. Avg ACC: '0.4046'
-      Jot. Last ACC: '0.1790'
+      Iso. Avg ACC: '0.2083'
+      Iso. Avg FGT: '-0.7100'
+      Jot. Avg ACC: '0.4436'
+      Jot. Last ACC: '0.2133'
+best_wikics:
+  gnn: GCN
+  lr: '1e-5'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-04-24T08:21:20.748186'
+    metrics:
+      Iso. Avg ACC: '0.4487'
+      Iso. Avg FGT: '-0.6167'
+      Jot. Avg ACC: '0.6189'
+      Jot. Last ACC: '0.3925'
+best_photo:
+  gnn: GCN
+  lr: '1e-5'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-04-24T08:46:50.366234'
+    metrics:
+      Iso. Avg ACC: '0.3471'
+      Iso. Avg FGT: '-0.6603'
+      Jot. Avg ACC: '0.6162'
+      Jot. Last ACC: '0.3102'
+best_products:
+  gnn: GCN
+  lr: '1e-5'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-04-24T09:06:38.611403'
+    metrics:
+      Iso. Avg ACC: '0.1240'
+      Iso. Avg FGT: '-0.0654'
+      Jot. Avg ACC: '0.4604'
+      Jot. Last ACC: '0.3464'
+best_arxiv_23:
+  gnn: GCN
+  lr: '1e-5'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-04-24T09:27:56.666038'
+    metrics:
+      Iso. Avg ACC: '0.0892'
+      Iso. Avg FGT: '-0.0412'
+      Jot. Avg ACC: '0.3737'
+      Jot. Last ACC: '0.2992'
+best_arxiv:
+  gnn: GCN
+  lr: '1e-5'
+  ewc_strength: 10000
+  _meta:
+    updated_at: '2025-05-04T20:17:21.797576'
+    metrics:
+      Iso. Avg ACC: '0.0374'
+      Iso. Avg FGT: '-0.4889'
+      Jot. Avg ACC: '0.1576'
+      Jot. Last ACC: '0.0437'

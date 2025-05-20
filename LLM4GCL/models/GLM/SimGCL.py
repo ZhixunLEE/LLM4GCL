@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import RoBERTaNet, LLaMANet
+from LLM4GCL.backbones import LLaMANet
 from LLM4GCL.common.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
 from LLM4GCL.common.prompts import get_instruction_prompts
 
@@ -27,8 +27,6 @@ class SimGCL(BaseModel):
         super(SimGCL, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
 
         self.lm_type = config['lm']
-        if self.lm_type == 'LLaMA':
-            self.hidden_dim = 4096
         self.output_dim = self.num_class
         self.lr = float(config['lr'])
         self.weight_decay = float(config['weight_decay'])
@@ -46,22 +44,25 @@ class SimGCL(BaseModel):
         self.max_node_text_len = config['max_node_text_len']
 
         class LMModel(nn.Module):
-            def __init__(self, lm_type, max_length, model_path, hidden_dim, output_dim, lora_config, dropout, att_dropout, T, device):
+            def __init__(self, lm_type, max_length, model_path, output_dim, lora_config, dropout, att_dropout, T, device):
                 super(LMModel, self).__init__()
+                self.lm_type = lm_type
                 self.device = device
                 self.max_length = max_length
                 self.T = T
-                
+               
                 if lm_type == 'LLaMA':
                     self.lm = LLaMANet(model_path, lora_config, dropout, att_dropout).to(device)
 
-                self.fc = nn.Linear(hidden_dim, output_dim).to(device)
+                self.hidden_dim = self.lm.hidden_dim
+                self.fc = nn.Linear(self.hidden_dim, output_dim).to(device)
 
             def forward(self, instructions):
                 tokenizer = self.lm.tokenizer
                 embedding = self.lm.embeddings
                 pad_embeds = embedding(torch.tensor(tokenizer.pad_token_id)).unsqueeze(0)
                 bos_id = tokenizer.bos_token_id
+                bos_id_list = [bos_id] if bos_id is not None else []
                 eos_id = tokenizer.eos_token_id
                 
                 batch_inputs_embeds = []
@@ -77,10 +78,10 @@ class SimGCL(BaseModel):
 
                     # <s> [INST] Context + Question [/INST] Label </s>
                     max_text_len = self.max_length - len(question_tokens.input_ids + answer_tokens.input_ids + [eos_id]) - 1
-                    input_ids = [bos_id] + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids + answer_tokens.input_ids + [eos_id]
+                    input_ids = bos_id_list + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids + answer_tokens.input_ids + [eos_id]
                     inputs_embeds = embedding(torch.tensor(input_ids).to(self.device))
 
-                    labels = [IGNORE_INDEX] * (len([bos_id] + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids)) + answer_tokens.input_ids + [eos_id]
+                    labels = [IGNORE_INDEX] * (len(bos_id_list + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids)) + answer_tokens.input_ids + [eos_id]
                     
                     batch_inputs_embeds.append(inputs_embeds)
                     batch_attention_mask.append([1] * len(input_ids))
@@ -105,6 +106,7 @@ class SimGCL(BaseModel):
                 tokenizer = self.lm.tokenizer
                 embedding = self.lm.embeddings
                 bos_id = tokenizer.bos_token_id
+                bos_id_list = [bos_id] if bos_id is not None else []
                 
                 batch_inputs_embeds = []
                 batch_attention_mask = []
@@ -116,7 +118,7 @@ class SimGCL(BaseModel):
 
                     # <s> [INST] Context + Question [/INST]
                     max_text_len = self.max_length - len(question_tokens.input_ids) - 1
-                    input_ids = [bos_id] + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids
+                    input_ids = bos_id_list + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids
                     inputs_embeds = embedding(torch.tensor(input_ids).to(self.device))
                     
                     batch_inputs_embeds.append(inputs_embeds)
@@ -133,13 +135,14 @@ class SimGCL(BaseModel):
                 attention_mask = torch.tensor(batch_attention_mask).to(self.device)
                 
                 outputs = self.lm.generate(inputs_embeds, attention_mask)
-                
+
                 return outputs
 
             def embedding_forward(self, instructions):
                 tokenizer = self.lm.tokenizer
                 embedding = self.lm.embeddings
                 bos_id = tokenizer.bos_token_id
+                bos_id_list = [bos_id] if bos_id is not None else []
                 
                 batch_inputs_embeds = []
                 batch_attention_mask = []
@@ -151,7 +154,7 @@ class SimGCL(BaseModel):
 
                     # <s> [INST] Context + Question [/INST]
                     max_text_len = self.max_length - len(question_tokens.input_ids) - 1
-                    input_ids = [bos_id] + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids
+                    input_ids = bos_id_list + context_tokens.input_ids[:max_text_len] + question_tokens.input_ids
                     inputs_embeds = embedding(torch.tensor(input_ids).to(self.device))
                     
                     batch_inputs_embeds.append(inputs_embeds)
@@ -174,12 +177,13 @@ class SimGCL(BaseModel):
             def cosine_forward(self, instructions):
                 outputs, attention_mask = self.embedding_forward(instructions)
                 x = mean_pooling(outputs.hidden_states[-1], attention_mask)
+
                 x = F.linear(F.normalize(x, p=2, dim=-1), F.normalize(self.fc.weight, p=2, dim=-1))
                 logits = self.T * x
 
                 return logits
             
-        self.model = LMModel(self.lm_type, self.max_length, self.model_path, self.hidden_dim, self.output_dim, self.lora_config, self.dropout, self.att_dropout, self.T, self.device)
+        self.model = LMModel(self.lm_type, self.max_length, self.model_path, self.output_dim, self.lora_config, self.dropout, self.att_dropout, self.T, self.device)
 
     @torch.no_grad()
     def update_proto(self, model, text_dataset, train_loader, class_src, class_dst, device, label_index):
@@ -217,12 +221,14 @@ class SimGCL(BaseModel):
     def train(self, curr_session, curr_epoch, model, text_dataset, train_loader, optimizer, class_num, config, device, label_index=None):
         model.train()
         all_loss, train_num = 0., 0
+
         for step, batch in enumerate(train_loader):
             if batch['node_id'].size(0) < 2:
                 break
             optimizer.zero_grad()
 
             instructions = get_instruction_prompts(batch['node_id'], text_dataset.data, text_dataset.data.raw_texts, label_index, class_num, self.dataset, self.hop, self.mode, self.include_label, self.max_node_text_len)
+
             outputs = model(instructions)
             loss = outputs.loss
             loss.backward()

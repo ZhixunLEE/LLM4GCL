@@ -8,6 +8,7 @@ from LLM4GCL.backbones import GCNNet, GATNet, SAGENet, SGCNet
 from LLM4GCL.common.utils import _save_checkpoint, _reload_best_model
 
 from tqdm import tqdm
+from transformers import BitsAndBytesConfig
 from torch_geometric.utils import k_hop_subgraph
 from transformers.models.auto import AutoModel, AutoTokenizer
 
@@ -21,8 +22,14 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
     elif model_name == 'LLaMA':
         model_name_str = 'Llama-3.1-8B'
         model_path = os.path.join(model_path, 'models--' + model_name_str.lower())
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=torch.float16,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4"
+        )
         tokenizer = AutoTokenizer.from_pretrained(model_path)
-        model = AutoModel.from_pretrained(model_path, output_hidden_states=True, return_dict=True, load_in_4bit=True).to(device)
+        model = AutoModel.from_pretrained(model_path, output_hidden_states=True, return_dict=True, quantization_config=quant_config).to(device)
         tokenizer.pad_token = tokenizer.eos_token
         hidden_layers = 32
     
@@ -64,20 +71,11 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
 def get_hidden_embeds(model_name, dataset, cache_path, layer_select, generate_func=None, func_params=None):
 
     def try_load():
-        if dataset in ['products', 'photo', 'arxiv']:
-            xs = []
-            for i in [0, 5, 10, 15, 20, 24]:
-                file_path = os.path.join(cache_path, f"{model_name}_{i}_layer_attr_{dataset}.pt")
-                if not os.path.exists(file_path):
-                    return None
-                xs.append(torch.load(file_path))
-            return xs
-        else:
-            file_path = os.path.join(cache_path, f"{model_name}_layer_attr_{dataset}.pt")
-            if not os.path.exists(file_path):
-                return None
-            xs = torch.load(file_path)
-            return [xs[i] for i in layer_select]
+        file_path = os.path.join(cache_path, f"{model_name}_layer_attr_{dataset}.pt")
+        if not os.path.exists(file_path):
+            return None
+        xs = torch.load(file_path)
+        return [xs[i] for i in layer_select]
     
     result = try_load()
     if result is not None:
@@ -93,7 +91,7 @@ def get_hidden_embeds(model_name, dataset, cache_path, layer_select, generate_fu
 
     raise FileNotFoundError(
         f"Failed to load embeddings for dataset {dataset} from {cache_path}\n"
-        f"Expected files: {[f'{i}_layer_attr_{dataset}.pt' for i in [0,5,10,15,20,24]] if dataset in ['products','photo','arxiv'] else f'layer_attr_{dataset}.pt'}"
+        f"Expected files: {f'layer_attr_{dataset}.pt'}"
     )
 
 

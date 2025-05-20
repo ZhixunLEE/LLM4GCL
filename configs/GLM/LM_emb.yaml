@@ -1,5 +1,5 @@
 default:
-  gnn: 'SAGE'
+  gnn: 'GCN'
   seed: [0, 1, 2, 3, 4]
   epochs: 300
   valid_epoch: 10
@@ -18,17 +18,7 @@ default:
   cache_batch_size: 30
   max_length: 512
 search_space:
-  gnn: ['GCN', 'SAGE']
+  gnn: ['GCN']
   lr: [1e-5, 1e-4, 1e-3]
   hidden_dim: [128, 256]
-best_cora:
-  gnn: GAT
-  lr: '1e-3'
-  hidden_dim: 128
-  _meta:
-    updated_at: '2025-04-02T16:44:15.909785'
-    metrics:
-      Iso. Avg ACC: '0.3333'
-      Iso. Avg FGT: '-0.6482'
-      Jot. Avg ACC: '0.3335'
-      Jot. Last ACC: '0.2467'
+

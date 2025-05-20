@@ -48,7 +48,7 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
         if model_name == 'RoBERTa':
             hidden_states = out.hidden_states[-1][:, 0, :].detach().cpu()
         elif model_name == 'LLaMA':
-            hidden_states = mean_pooling(out.hidden_states[-1], model_input['attention_mask'].cpu())
+            hidden_states = mean_pooling(out.hidden_states[-1].detach().cpu(), model_input['attention_mask'].cpu())
         hidden_embdes.extend(hidden_states)
 
     hidden_embdes = torch.stack(hidden_embdes, dim=0)
@@ -87,8 +87,8 @@ def get_hidden_embeds(model_name, dataset, cache_path, generate_func=None, func_
 
 class LM_emb(BareGNN):
 
-    def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, seed, device):
-        super(LM_emb, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, seed, device)
+    def __init__(self, task_loader, result_logger, config, checkpoint_path, dataset, model_name, model_path, local_ce, seed, device):
+        super(LM_emb, self).__init__(task_loader, result_logger, config, checkpoint_path, dataset, model_name, local_ce, seed, device)
 
         self.lm_type = config['lm']
         if self.lm_type == 'RoBERTa':
@@ -191,7 +191,7 @@ class LM_emb(BareGNN):
 
             acc_list = []
             for s in range(curr_session):
-                _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
+                _, _, text_dataset_iso, _, _, _, test_loader_isolate, _ = self.task_loader.get_task(s)
                 text_dataset_iso.data.x = hidden_embeds
                 prev_acc_test_isolate, prev_f1_test_isolate = self.evaluate(self.model, text_dataset_iso, test_loader_isolate, class_dst, self.config, self.device)
                 acc_list.append(prev_acc_test_isolate)

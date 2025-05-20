@@ -19,4 +19,80 @@ search_space:
   gnn: ['GCN', 'SAGE']
   lr: [1e-5, 1e-4, 1e-3]
   hidden_dim: [128, 256]
-
+best_cora:
+  gnn: GCN
+  lr: '1e-4'
+  hidden_dim: 256
+  _meta:
+    updated_at: '2025-04-24T14:07:56.073451'
+    metrics:
+      Iso. Avg ACC: '0.6383'
+      Iso. Avg FGT: '-0.2467'
+      Jot. Avg ACC: '0.7176'
+      Jot. Last ACC: '0.6014'
+best_citeseer:
+  gnn: SAGE
+  lr: '1e-3'
+  hidden_dim: 256
+  _meta:
+    updated_at: '2025-04-24T14:08:28.854549'
+    metrics:
+      Iso. Avg ACC: '0.2983'
+      Iso. Avg FGT: '-0.1725'
+      Jot. Avg ACC: '0.5083'
+      Jot. Last ACC: '0.2950'
+best_wikics:
+  gnn: GCN
+  lr: '1e-4'
+  hidden_dim: 128
+  _meta:
+    updated_at: '2025-04-24T14:12:11.930325'
+    metrics:
+      Iso. Avg ACC: '0.5510'
+      Iso. Avg FGT: '-0.3304'
+      Jot. Avg ACC: '0.6280'
+      Jot. Last ACC: '0.4630'
+best_photo:
+  gnn: GCN
+  lr: '1e-4'
+  hidden_dim: 128
+  _meta:
+    updated_at: '2025-04-24T14:28:44.021101'
+    metrics:
+      Iso. Avg ACC: '0.4994'
+      Iso. Avg FGT: '-0.2666'
+      Jot. Avg ACC: '0.6568'
+      Jot. Last ACC: '0.4810'
+best_arxiv_23:
+  gnn: SAGE
+  lr: '1e-3'
+  hidden_dim: 256
+  _meta:
+    updated_at: '2025-04-24T14:46:40.009339'
+    metrics:
+      Iso. Avg ACC: '0.2187'
+      Iso. Avg FGT: '-0.1412'
+      Jot. Avg ACC: '0.3933'
+      Jot. Last ACC: '0.2619'
+best_arxiv:
+  gnn: GCN
+  lr: '1e-5'
+  hidden_dim: 256
+  _meta:
+    updated_at: '2025-05-04T23:43:02.431106'
+    metrics:
+      Iso. Avg ACC: '0.3437'
+      Iso. Avg FGT: '-0.1812'
+      Jot. Avg ACC: '0.4170'
+      Jot. Last ACC: '0.3138'
+best_products:
+  gnn: GCN
+  lr: '1e-3'
+  hidden_dim: 256
+  _meta:
+    updated_at: '2025-04-24T14:38:03.649380'
+    metrics:
+      Iso. Avg ACC: '0.2423'
+      Iso. Avg FGT: '-0.1465'
+      Jot. Avg ACC: '0.4835'
+      Jot. Last ACC: '0.3092'

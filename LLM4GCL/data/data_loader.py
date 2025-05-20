@@ -1,11 +1,13 @@
+import copy
 import json
 import heapq
 import torch
+
 from torch_geometric.data import Data
 from torch_geometric.utils import add_self_loops
-
 from torch.utils.data import Dataset
 from huggingface_hub import hf_hub_download
+
 
 class TextDataset(Dataset):
     def __init__(self, dataset, data_path):
@@ -14,11 +16,7 @@ class TextDataset(Dataset):
 
         self.data, self.id_by_class = self._load_data()
         self.raw_texts = self.data.raw_texts
-
-        label_text_list = None
-        with open('LLM4GCL/common/label_text.json', 'r', encoding='utf-8') as f:
-            label_text_list = json.load(f)[dataset]
-        self.label_texts = label_text_list
+        self.label_texts = self.data.label_texts
 
     def __getitem__(self, idx):
         item = {}
@@ -31,6 +29,13 @@ class TextDataset(Dataset):
 
     def __len__(self):
         return len(self.raw_texts)
+    
+    def _get_label_text(self, dataset):
+        label_text_list = None
+        with open('LLM4GCL/common/label_text.json', 'r', encoding='utf-8') as f:
+            label_text_list = json.load(f)[dataset]
+
+        return label_text_list
     
     def _load_data(self, ):
         path = self.data_path + self.dataset + ".pt"
@@ -106,9 +111,13 @@ class TextDataset(Dataset):
         sorted_class_idx = heapq.nlargest(labels.max().item() + 1, enumerate(num_nodes), key=lambda x: x[1])
 
         # Re-order labels
+        label_texts = self._get_label_text(self.dataset)
+        sorted_label_texts = copy.deepcopy(label_texts)
         for i, (id, _) in enumerate(sorted_class_idx):
             class_idx = id_by_class[id]
             labels[class_idx] = i
+            sorted_label_texts[i] = label_texts[id]
+        data.label_texts = sorted_label_texts
 
         class_list = labels.unique().numpy()
         id_by_class = {i: [] for i in class_list}

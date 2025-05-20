@@ -3,9 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from LLM4GCL.models import BaseModel
-from LLM4GCL.backbones import RoBERTaNet, LLaMANet
+from LLM4GCL.backbones import LLaMANet
 from LLM4GCL.common.utils import adjust_learning_rate, _save_checkpoint, _reload_best_model
-from LLM4GCL.common.prompts import get_genreal_prompts, get_label_text
+from LLM4GCL.common.prompts import get_genreal_prompts
 
 from tqdm import tqdm
 from torch.nn.utils import clip_grad_norm_
@@ -174,7 +174,7 @@ class LLaMA(BaseModel):
     
     def fit(self, iter):
         optimizer = self.get_optimizer(self.model)
-        label_text_list = get_label_text(self.dataset)
+        label_text_list = self.task_loader.text_dataset.label_texts
         for curr_session in range(self.session_num):
             if curr_session != 0:
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
@@ -228,5 +228,6 @@ class LLaMA(BaseModel):
             print("Session: {} | Jot. Acc Test: {:.4f} | Jot. F1 Test: {:.4f}".format(curr_session, curr_acc_test_joint, curr_f1_test_joint))
 
             self.result_logger.add_new_results(acc_list, curr_acc_test_joint)
-
+        
+        torch.cuda.empty_cache()
         return self.result_logger

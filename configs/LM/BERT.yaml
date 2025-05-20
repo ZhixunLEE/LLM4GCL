@@ -1,7 +1,7 @@
 default:
-  lm: 'LLaMA'
+  lm: 'BERT'
   seed: [0, 1, 2, 3, 4]
-  epochs: 10
+  epochs: 20
   valid_epoch: 1
   warmup_epochs: 1
   lr: 2e-4

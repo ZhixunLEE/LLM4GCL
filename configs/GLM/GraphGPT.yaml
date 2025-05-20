@@ -1,0 +1,42 @@
+default:
+  llm: 'LLaMA'
+  seed: [0, 1, 2, 3, 4]
+  dropout: 0.1
+  att_dropout: 0.1
+  batch_size: 32 # not used !!!
+  grad_steps: 2
+  valid_epoch: 1
+  warmup_epochs: 1
+  min_lr: 5e-6
+  patience: 3
+
+  # Stage 1: (Self-supervised Training) Graph Matching 
+  do_stage1: True
+  s1_k_hop: 2
+  s1_num_neighbors: 5
+  s1_max_txt_length: 512
+  s1_max_ans_length: 256
+  s1_epoch: 2
+  s1_batch_size: 5
+  s1_lr: 1e-4
+
+  # Stage 2: Instruction Tuning
+  do_stage2: True
+  s2_num_neighbors: 4
+  s2_max_txt_length: 512
+  s2_max_ans_length: 16
+  s2_epoch: 10
+  s2_batch_size: 5
+  s2_lr: 1e-4
+  s2_patience: 2
+
+  output_dim: 2048
+  wd: 0.05
+  load_ground_embedding: 0
+  output_dir: '/root/autodl-tmp/GraphGPT'
+
+  LoRA:
+    use_lora: True
+    lora_r: 5
+    lora_alpha: 16
+    lora_dropout: 0.05

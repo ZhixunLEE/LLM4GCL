@@ -11,8 +11,17 @@ default:
   dropout: 0.1
   att_dropout: 0.1
   patience: 5
-  batch_size: 2
+  batch_size: 4
   max_length: 512
+
+  llm_freeze: True
+  neighbor_template: 'ND' # ['ND', 'HO']
+  nd_mean: True
+  k_hop: 2
+  sample_size: 10
+  hop_field: 4
+
+  proj_layer: 2
 
   LoRA:
     use_lora: True

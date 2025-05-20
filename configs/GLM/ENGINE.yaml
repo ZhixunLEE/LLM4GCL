@@ -18,7 +18,7 @@ default:
   num_heads: 4 # only available for GATConv
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
-  engine_layer_select: [0,5,10,15,20,-1]
+  engine_layer_select: [0, 6, 12, 18, 24, -1]
   engine_T: 0.1
   engine_r: 32
 search_space:

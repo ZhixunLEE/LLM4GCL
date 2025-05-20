@@ -15,6 +15,8 @@ class TaskLoader():
         self.id_by_class = text_dataset.id_by_class
         self.cl_type = cl_type
         self.task_type = task_type
+        self.label_num = self.data.y.max().item() + 1
+
         self.base_session = base_session
         self.novel_session = novel_session
         self.ways = ways
@@ -81,13 +83,13 @@ class TaskLoader():
         test_loader_isolate = DataLoader(test_dataset_isolate, batch_size=self.batch_size, shuffle=False)
         test_loader_joint = DataLoader(test_dataset_joint, batch_size=self.batch_size, shuffle=False)
 
-        if self.task_type == 'GFSCIL':
+        if self.task_type == 'FSNCIL':
             if task_id == 0: # Base Session
                 class_src, class_dst = 0, self.base_session
             else:
-                class_src, class_dst = self.base_session + (task_id - 1) * self.ways, self.base_session + task_id * self.ways
-        elif self.task_type == 'GCIL':
-            class_src, class_dst = task_id * self.ways, (task_id + 1) * self.ways
+                class_src, class_dst = self.base_session + (task_id - 1) * self.ways, min(self.base_session + task_id * self.ways, self.label_num)
+        elif self.task_type == 'NCIL':
+            class_src, class_dst = task_id * self.ways, min((task_id + 1) * self.ways, self.label_num)
 
         return class_src, class_dst, text_dataset_isolate, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint
 
@@ -108,25 +110,25 @@ class TaskLoader():
             valid_idx_curr_task = []
             test_idx_curr_task = []
 
-            if self.task_type == 'GFSCIL':
+            if self.task_type == 'FSNCIL':
                 if i == 0: # Base Session
                     curr_task_class_idx = all_class[ : self.base_session]
                 else:
-                    curr_task_class_idx = all_class[self.base_session + (i - 1) * self.ways : self.base_session + i * self.ways]
-            elif self.task_type == 'GCIL':
-                curr_task_class_idx = all_class[i * self.ways : (i + 1) * self.ways]
+                    curr_task_class_idx = all_class[self.base_session + (i - 1) * self.ways : min(self.base_session + i * self.ways, self.label_num)]
+            elif self.task_type == 'NCIL':
+                curr_task_class_idx = all_class[i * self.ways : min((i + 1) * self.ways, self.label_num)]
 
             for cla in curr_task_class_idx:
                 node_idx = self.id_by_class[cla]
                 node_idx_curr_class.extend(node_idx)
                 node_num = len(node_idx)
 
-                if self.task_type == 'GFSCIL':
+                if self.task_type == 'FSNCIL':
                     if i == 0: # Base Session
                         train_shots, valid_shots, test_shots = self.base_train_shots, self.valid_shots, self.test_shots
                     else:
                         train_shots, valid_shots, test_shots = self.train_shots, self.valid_shots, self.test_shots
-                elif self.task_type == 'GCIL':
+                elif self.task_type == 'NCIL':
                     train_shots, valid_shots, test_shots = self.train_shots, self.valid_shots, self.test_shots
 
                 if node_num < (train_shots + valid_shots + test_shots):
@@ -151,16 +153,16 @@ class TaskLoader():
             else:
                 test_idx_per_task_joint.append(test_idx_curr_task)
 
-            if self.task_type == 'GFSCIL':
+            if self.task_type == 'FSNCIL':
                 if i == 0: # Base Session
                     curr_dataset = self._adjust_graph(all_class[ : self.base_session])
                     prev_dataset = self._adjust_graph(all_class[ : self.base_session])
                 else:
-                    curr_dataset = self._adjust_graph(all_class[self.base_session + (i - 1) * self.ways : self.base_session + i * self.ways])
-                    prev_dataset = self._adjust_graph(all_class[: self.base_session + i * self.ways])
-            elif self.task_type == 'GCIL':
-                curr_dataset = self._adjust_graph(all_class[i * self.ways : (i + 1) * self.ways])
-                prev_dataset = self._adjust_graph(all_class[: (i + 1) * self.ways])
+                    curr_dataset = self._adjust_graph(all_class[self.base_session + (i - 1) * self.ways : min(self.base_session + i * self.ways, self.label_num)])
+                    prev_dataset = self._adjust_graph(all_class[: min(self.base_session + i * self.ways, self.label_num)])
+            elif self.task_type == 'NCIL':
+                curr_dataset = self._adjust_graph(all_class[i * self.ways : min((i + 1) * self.ways, self.label_num)])
+                prev_dataset = self._adjust_graph(all_class[: min((i + 1) * self.ways, self.label_num)])
 
             dataset_per_task_isolate.append(curr_dataset)
             dataset_per_task_joint.append(prev_dataset)

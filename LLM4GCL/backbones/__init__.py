@@ -6,3 +6,4 @@ from .GNN.SGC import SGConv
 
 from .LM.RoBERTa import RoBERTaNet
 from .LM.LLaMA import LLaMANet
+from .LM.BERT import BERTNet

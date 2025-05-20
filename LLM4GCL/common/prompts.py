@@ -5,13 +5,6 @@ import numpy as np
 
 from textwrap import shorten
 
-def get_label_text(dataset):
-    label_text_list = None
-    with open('LLM4GCL/common/label_text.json', 'r', encoding='utf-8') as f:
-        label_text_list = json.load(f)[dataset]
-
-    return label_text_list
-
 
 # Genreal Prompts for Inference
 def get_genreal_prompts(dataset, label_text):
@@ -28,7 +21,41 @@ def get_genreal_prompts(dataset, label_text):
     return prompts_dict[dataset]
 
 
-# Genreal Prompts for Instruction LM
+# Prompts for LLaGA
+def get_LLaGA_prompts(dataset, label_text):
+    SYSTEM_PROMPT = "You are a helpful language and graph assistant. You can understand the graph content provided by the user and assist with the node classification task by outputting the label that is most likely to apply to the node."
+
+    LLaGA_descriptions_dict = {
+        "cora": f"Given a node-centered graph: <graph>, each node represents a paper, we need to classify the center node into {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+        "citeseer": f"Given a node-centered graph: <graph>, each node represents a paper, we need to classify the center node into {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+        "wikics": f"Given a node-centered graph: <graph>, each node represents an entity, we need to classify the center node into {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+        "photo": f"Given a node-centered graph: <graph>, each node represents an item, we need to classify the center node into {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+        "products": f"Given a node-centered graph: <graph>, each node represents an item, we need to classify the center node into {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+        "arxiv_23": f"Given a node-centered graph: <graph>, we need to classify the center node into {len(label_text)} classes: {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+        "arxiv": f"Given a node-centered graph: <graph>, we need to classify the center node into {len(label_text)} classes: {len(label_text)} classes: {', '.join([label.lower() for label in label_text])}, please tell me which class the center node belongs to?",
+    }
+
+    return SYSTEM_PROMPT, LLaGA_descriptions_dict[dataset]
+
+
+# Prompts for GraphGPT
+MATCHING_TEMPLATES = {
+    "academic_network": "Given a sequence of graph tokens <graph> that constitute a subgraph of a citation graph, where the first token represents the central node of the subgraph, and the remaining nodes represent the first or second order neighbors of the central node. Each graph token contains the title and abstract information of the paper at this node. Here is a list of paper titles: {{paper_titles}}. Please reorder the list of papers according to the order of graph tokens (i.e., complete the matching of graph tokens and papers).",
+    "social_network": "Given a sequence of graph tokens <graph> that constitute a subgraph of a social network, where the first token represents the central node (user) of the subgraph, and the remaining nodes represent the first or second order neighbors of the central node. Each graph token contains the profile description of the user represented by this node. Here is a list of user profile descriptions: {{user_profiles}}. Please reorder the list of users according to the order of the graph tokens (i.e., complete the matching of graph tokens and users).",
+    "ecommerce_network": "Given a sequence of graph tokens <graph> that constitute a subgraph of an e-commerce network, where the first token represents the central node (item) of the subgraph, and the remaining nodes represent the first or second order neighbors of the central node. Each graph token contains the comment of the item represented by this node. Here is a list of item comments: {{item_comments}}. Please reorder the list of items according to the order of the graph tokens (i.e., complete the matching of graph tokens and items). "
+} 
+
+GraphGPT_DESC = {
+    "cora": 'Given a citation graph: \n<graph>\nwhere the 0th node is the target paper, with the following information: \n{{raw_text}}\n Question: Which of the following specific research does this paper belong to: {{label_names}}. Directly give the full name of the most likely category of this paper.',
+    "citeseer": 'Given a citation graph: \n<graph>\nwhere the 0th node is the target paper, with the following information: \n{{raw_text}}\n Question: Which of the following specific research does this paper belong to: {{label_names}}. Directly give the full name of the most likely category of this paper.',
+    "wikics": 'Given a citation graph: \n<graph>\nwhere the 0th node is the target paper, with the following information: \n{{raw_text}}\n Question: Which of the following specific research does this paper belong to: {{label_names}}. Directly give the full name of the most likely category of this paper.', 
+    "photo": "Given an e-commerce network: \n<graph>\nwhere the 0-th node is the target item, with the following information: \n{{raw_text}}\n Question: Which of the following categories does this item belong to: {{label_names}}. Directly give the full name of the most likely category of this photo item. ",
+    "products": "Given an e-commerce network: \n<graph>\nwhere the 0-th node is the target item, with the following information: \n{{raw_text}}\n Question: Which of the following categories does this product belong to: {{label_names}}. Directly give the full name of the most likely category of this product. ",
+    "arxiv_23": 'Given a citation graph: \n<graph>\nwhere the 0th node is the target paper, with the following information: \n{{raw_text}}\n Question: Which of the following arXiv CS sub-category does this paper belong to: {{label_names}}. Directly give the most likely arXiv CS sub-categories of this paper.', 
+    "arxiv": 'Given a citation graph: \n<graph>\nwhere the 0th node is the target paper, with the following information: \n{{raw_text}}\n Question: Which of the following arXiv CS sub-category does this paper belong to: {{label_names}}. Directly give the most likely arXiv CS sub-categories of this paper.', 
+}
+
+# Instructions for SimGCL
 def get_instruction_prompts(node_index, graph_data, text, label_index, class_num, dataset, hop=[20, 20], mode="ego", include_label=False, max_node_text_len=256):
 
     def get_subgraph(node_idx, edge_index, hop):
@@ -90,7 +117,7 @@ def get_instruction_prompts(node_index, graph_data, text, label_index, class_num
 
         return prompt_str
 
-    label_text_list = get_label_text(dataset)
+    label_text_list = graph_data.label_texts
     label_text = label_text_list[ :class_num]
 
     prefix_prompts_dict = {

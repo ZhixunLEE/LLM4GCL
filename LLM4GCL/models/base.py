@@ -53,7 +53,7 @@ class BaseModel(nn.Module):
                 _reload_best_model(self.model, self.checkpoint_path, self.dataset, self.model_name, self.seed)
 
             class_src, class_dst, text_dataset_iso, text_dataset_joint, train_loader, valid_loader, test_loader_isolate, test_loader_joint = self.task_loader.get_task(curr_session)
-
+            
             progress_bar = tqdm(range(self.config['epochs']))
             progress_bar.set_description(f'Training | Iter {iter} | Session {curr_session}')
 

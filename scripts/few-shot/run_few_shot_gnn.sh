@@ -12,13 +12,13 @@ for method in "${GNN[@]}"; do
             --model_type "GNN" \
             --model "$method" \
             --cl_type 'class' \
-            --task_type 'NCIL' \
+            --task_type 'FSNCIL' \
             --ntrail 1 \
             --hyperparam_search \
             --search_type 'grid' \
             --num_samples 10
 
-        output_dir="/root/autodl-tmp/results/${type}/${method}/NCIL"
+        output_dir="/root/autodl-tmp/results/${type}/${method}/FSNCIL"
         mkdir -p "$output_dir"
 
         # Then Repeat with best hyper-parameters
@@ -28,7 +28,7 @@ for method in "${GNN[@]}"; do
             --model_type "GNN" \
             --model "$method" \
             --cl_type 'class' \
-            --task_type 'NCIL' \
+            --task_type 'FSNCIL' \
             --ntrail 5 > "$output_file"
     done
 done
