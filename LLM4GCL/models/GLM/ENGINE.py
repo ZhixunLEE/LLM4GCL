@@ -20,8 +20,8 @@ def generate_hidden_embeds(dataset, model_name, model_path, cache_path, text, ba
         model = AutoModel.from_pretrained("roberta-large", output_hidden_states=True, return_dict=True, cache_dir=model_path).cuda()
         hidden_layers = 24
     elif model_name == 'LLaMA':
-        model_name_str = 'Llama-3.1-8B'
-        model_path = os.path.join(model_path, 'models--' + model_name_str.lower())
+        model_name_str = 'meta-llama/Llama-3.1-8B'
+        model_path = os.path.join(model_path)
         quant_config = BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_compute_dtype=torch.float16,
