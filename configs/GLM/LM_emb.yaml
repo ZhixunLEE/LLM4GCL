@@ -14,7 +14,7 @@ default:
   aggr: 'mean' # ['mean', 'max', 'lstm'], only available for SAGEConv
 
   lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
-  cache: '/root/autodl-tmp/hidden_embs/'
+  cache: '/YOUR_PATH/hidden_embs/'
   cache_batch_size: 30
   max_length: 512
 search_space:
