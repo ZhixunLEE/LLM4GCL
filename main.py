@@ -44,7 +44,7 @@ if __name__ == '__main__':
                         default='cora', 
                         choices=['cora', 'citeseer', 'wikics', 'photo', 'products', 'arxiv_23', 'arxiv'], 
                         help='the name of TAG dataset')
-    parser.add_argument('--data_path', type=str, default='/root/autodl-tmp/data/', help='the path of TAG dataset')
+    parser.add_argument('--data_path', type=str, default='/YOUR_PATH/data/', help='the path of TAG dataset')
 
     # Model
     parser.add_argument('--model_type', 
@@ -56,8 +56,8 @@ if __name__ == '__main__':
                             ' "LM": Use only Language Model (LM) for training and inference. '
                             ' "GLM": Combine Graph Neural Network or Graph and Language Model (LM) into a unified model.')
     parser.add_argument('--model', type=str, default='GPT', help='the name of model, must match with the model_type')
-    parser.add_argument('--model_path', type=str, default='/root/autodl-tmp/model/', help='the path to load pre-trained models')
-    parser.add_argument('--ckpt_path', type=str, default='/root/autodl-tmp/ckpt/', help='the path to store best model weights')
+    parser.add_argument('--model_path', type=str, default='/YOUR_PATH/model/', help='the path to load pre-trained models')
+    parser.add_argument('--ckpt_path', type=str, default='/YOUR_PATH/ckpt/', help='the path to store best model weights')
 
     # Settings
     parser.add_argument('--cl_type', type=str, default='class', choices=['class'], help='The type of CL. E.g., class is for class incremental learning')
