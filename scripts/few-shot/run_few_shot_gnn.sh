@@ -18,7 +18,7 @@ for method in "${GNN[@]}"; do
             --search_type 'grid' \
             --num_samples 10
 
-        output_dir="/root/autodl-tmp/results/${type}/${method}/FSNCIL"
+        output_dir="/YOUR_PATH/results/${type}/${method}/FSNCIL"
         mkdir -p "$output_dir"
 
         # Then Repeat with best hyper-parameters
