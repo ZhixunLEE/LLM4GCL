@@ -33,7 +33,7 @@ default:
   output_dim: 2048
   wd: 0.05
   load_ground_embedding: 0
-  output_dir: '/root/autodl-tmp/GraphGPT'
+  output_dir: '/YOUR_PATH/GraphGPT'
 
   LoRA:
     use_lora: True
