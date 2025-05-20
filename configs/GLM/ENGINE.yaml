@@ -1,7 +1,7 @@
 default:
   lm: 'LLaMA' # ['RoBERTa', 'LLaMA']
   seed: [0, 1, 2, 3, 4]
-  cache: '/root/autodl-tmp/hidden_states/'
+  cache: '/YOUR_PATH/hidden_states/'
   lr: 5e-5
   weight_decay: 5e-4
   epochs: 500
