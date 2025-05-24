@@ -11,8 +11,7 @@ This is the official implementation of the following paper:
 > **Can LLMs Alleviate Catastrophic Forgetting in Graph Continual Learning? A Systematic Study** 
 >
 > Ziyang Cheng*, Zhixun Li*, Yuhan Li, Yixin Song, Kangyi Zhao, Dawei Cheng, Jia Li, and Jeffrey Xu Yu**
->
-> Appendix: [https://github.com/ZhixunLEE/LLM4GCL/blob/main/Appendix.pdf](https://github.com/ZhixunLEE/LLM4GCL/blob/main/Appendix.pdf)
+
 
 ## 🚀 Environment Setup
  
