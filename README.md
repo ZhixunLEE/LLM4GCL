@@ -12,6 +12,9 @@ This is the official implementation of the following paper:
 >
 > Ziyang Cheng*, Zhixun Li*, Yuhan Li, Yixin Song, Kangyi Zhao, Dawei Cheng, Jia Li, and Jeffrey Xu Yu**
 
+## ✨ Extended Results
+
+![results](embeddings_vis.pdf)
 
 ## 🚀 Environment Setup
  
