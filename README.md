@@ -14,7 +14,7 @@ This is the official implementation of the following paper:
 
 ## ✨ Extended Results
 
-![results](embeddings_vis.pdf)
+<iframe src="./embeddings_vis" style="width:100%; height:500px; border:none;"></iframe>
 
 ## 🚀 Environment Setup
  
