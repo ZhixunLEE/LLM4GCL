@@ -14,7 +14,7 @@ This is the official implementation of the following paper:
 
 ## ✨ Extended Results
 
-<iframe src="./prototype_vis" style="width:100%; height:500px; border:none;"></iframe>
+![](./prototype_vis.pdf)
 
 ## 🚀 Environment Setup
  
