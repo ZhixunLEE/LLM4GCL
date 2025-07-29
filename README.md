@@ -14,7 +14,7 @@ This is the official implementation of the following paper:
 
 ## ✨ Extended Results
 
-![](./prototype_vis.pdf)
+![](./prototype_vis.jpg)
 
 ## 🚀 Environment Setup
  
