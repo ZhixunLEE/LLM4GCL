@@ -37,8 +37,8 @@ class GPT(BaseModel):
                 self.lm_type = lm_type
 
                 self.client = OpenAI(
-                    api_key="sk-OIfFSkBR56F9lCjS69PWl3ynX9OmbvaEib4d9gDwBANjzeUr",
-                    base_url="https://35.aigcbest.top/v1"
+                    api_key="",
+                    base_url=""
                 )
 
             def forward(self, samples, prompts):
