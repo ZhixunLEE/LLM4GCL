@@ -10,11 +10,7 @@ This is the official implementation of the following paper:
 
 > **Can LLMs Alleviate Catastrophic Forgetting in Graph Continual Learning? A Systematic Study** 
 >
-> Ziyang Cheng*, Zhixun Li*, Yuhan Li, Yixin Song, Kangyi Zhao, Dawei Cheng, Jia Li, and Jeffrey Xu Yu**
-
-## ✨ Extended Results
-
-![](./prototype_vis.jpg)
+> Anonymous authors
 
 ## 🚀 Environment Setup
  
@@ -251,8 +247,3 @@ We gratefully acknowledge all cited papers for their valuable contributions! The
 [[Paper](https://arxiv.org/pdf/2502.18771)][[Code](https://github.com/myflashbarry/LLM-benchmarking)] ![](https://img.shields.io/badge/Benchmark-A52A2A)
 
 
-## 📌 Contact
-
-For discussions and inquiries, you can reach **Ziyang Cheng** at: **[zycheng2003@gmail.com](mailto:zycheng2003@gmail.com)**.  
-  
-Moreover, feel free to open issues or suggest improvements—we appreciate your contributions 🤩!  
