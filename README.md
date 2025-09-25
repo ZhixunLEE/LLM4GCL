@@ -9,8 +9,7 @@
 This is the official implementation of the following paper:
 
 > **Can LLMs Alleviate Catastrophic Forgetting in Graph Continual Learning? A Systematic Study** 
->
-> Anonymous authors
+
 
 ## 🚀 Environment Setup
  
@@ -245,5 +244,6 @@ We gratefully acknowledge all cited papers for their valuable contributions! The
 
 * **[Arxiv 2025]** **Exploring Graph Tasks with Pure LLMs: A Comprehensive Benchmark and Investigation**.
 [[Paper](https://arxiv.org/pdf/2502.18771)][[Code](https://github.com/myflashbarry/LLM-benchmarking)] ![](https://img.shields.io/badge/Benchmark-A52A2A)
+
 
 
